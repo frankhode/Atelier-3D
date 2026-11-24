@@ -113,6 +113,16 @@
           <span data-icon="folder"></span><span>Archivo</span>
         </button>
       </nav>
+      <div id="light-aim-bar" class="light-aim-bar" hidden>
+        <div role="status">
+          <strong id="light-aim-name"></strong
+          ><span>Tocá la superficie que querés iluminar</span>
+        </div>
+        <button id="cancel-light-aim" class="button">Cancelar</button>
+      </div>
+      <div id="light-target-marker" hidden aria-hidden="true">
+        <span class="target-cross"></span><span class="target-label"></span>
+      </div>
       <div id="toast" role="status" hidden></div>
       <div id="loading" class="loading">
         <span class="spinner"></span>
@@ -141,6 +151,12 @@
               Usá dos dedos. Con mouse, rueda para acercar y botón derecho para
               desplazar.
             </dd>
+            <dt>Apuntar una luz</dt>
+            <dd>
+              En Luces, elegí “Apuntar en la escena” y tocá una pared, un
+              peldaño o un objeto. El ancho del haz se ajusta por separado, con
+              opciones simples o en metros.
+            </dd>
             <dt>Conservar un punto de vista</dt>
             <dd>
               Bloqueá la cámara con el candado. Volvé a pulsarlo para navegar.
@@ -157,7 +173,7 @@
             </dd>
           </dl>
           <p class="muted">
-            Versión 0.1 · Sin cuentas ni servicios externos. OBJ sin MTL; GLB
+            Versión 0.2 · Sin cuentas ni servicios externos. OBJ sin MTL; GLB
             autocontenido sin compresión Draco, Meshopt ni KTX2. No se
             reproducen animaciones.
           </p>

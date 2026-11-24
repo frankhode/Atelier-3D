@@ -1028,3 +1028,160 @@ body.panel-open #fit-camera {
     animation: none;
   }
 }
+
+/* Point selection leaves the entire composition free for a single tap. */
+.light-target-controls {
+  padding: 14px 0 2px;
+  border-block: 1px solid var(--border);
+  margin: 0 0 18px;
+}
+.target-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.target-summary > span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+  font-variant-numeric: tabular-nums;
+}
+.target-summary .button {
+  padding: 8px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.target-summary svg {
+  width: 17px;
+  height: 17px;
+}
+.beam-presets {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+  margin-bottom: 16px;
+}
+.beam-presets .button {
+  font-size: 12px;
+  padding: 8px 4px;
+  min-height: 44px;
+}
+.beam-presets .button.active {
+  background: #c5d9d220;
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.light-aim-bar {
+  position: absolute;
+  z-index: 12;
+  bottom: calc(20px + env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100% - 24px);
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  background: #22272bf5;
+  border: 1px solid #d6bd8055;
+  border-radius: 12px;
+  box-shadow: 0 8px 35px #0006;
+  padding: 14px 16px;
+}
+.light-aim-bar strong {
+  display: block;
+  color: #e1c88f;
+  font-size: 13px;
+  font-weight: 550;
+  margin-bottom: 6px;
+}
+.light-aim-bar span {
+  display: block;
+  font-size: 14px;
+  line-height: 1.5;
+}
+body.aiming-light canvas {
+  cursor: crosshair;
+}
+body.aiming-light .dock,
+body.aiming-light .scene-footer {
+  visibility: hidden;
+}
+body.aiming-light .top-actions,
+body.aiming-light .view-tools {
+  opacity: 0.3;
+  pointer-events: none;
+}
+#light-target-marker {
+  position: fixed;
+  width: 34px;
+  height: 34px;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  pointer-events: none;
+}
+.target-cross {
+  position: absolute;
+  inset: 3px;
+  border: 1.5px solid #ffe2a1;
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 1px #1b1b1bb3,
+    0 0 14px #0007;
+}
+.target-cross::before,
+.target-cross::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 40px;
+  height: 1px;
+  background: #ffe2a1;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 1px #0007;
+}
+.target-cross::after {
+  transform: translate(-50%, -50%) rotate(90deg);
+}
+.target-label {
+  position: absolute;
+  top: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #ffe2a1;
+  background: #191d20e6;
+  padding: 5px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.panel {
+  z-index: 5;
+}
+@media (max-width: 600px) {
+  .light-aim-bar {
+    width: calc(100% - 24px);
+    gap: 12px;
+    bottom: calc(14px + env(safe-area-inset-bottom));
+  }
+  .light-aim-bar > div {
+    flex: 1;
+    min-width: 0;
+  }
+  .light-aim-bar strong {
+    font-size: 11px;
+  }
+  .light-aim-bar span {
+    font-size: 13px;
+  }
+  .light-aim-bar .button {
+    padding: 9px;
+    font-size: 13px;
+  }
+  body.aiming-light #toast {
+    top: auto;
+    bottom: calc(116px + env(safe-area-inset-bottom));
+  }
+}

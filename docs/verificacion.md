@@ -42,3 +42,9 @@ La compilación y las pruebas de datos, cargadores, orientación y controles son
 ## Publicación
 
 Los workflows verifican tests/build y preparan `dist/` para Pages. La configuración administrativa de Pages y el despliegue efectivo no forman parte de la comprobación gráfica local: confirmar el estado del workflow y la URL devuelta por GitHub antes de considerar el sitio publicado.
+
+## Actualización 0.2: apuntar luces con un toque
+
+Se agregan pruebas de selección real por rayos con cámaras perspectiva y ortogonal; coordenadas del canvas desplazado; exclusión de mallas, ancestros y modelos ocultos; intersección más cercana; marcador dentro/fuera del encuadre; tap, fondo vacío, arrastre, multitoque, pointercancel y Escape; preservación del bloqueo de cámara; rechazo de un destino no aplicable; equivalencia entre diámetro y ángulo; persistencia JSON de los nuevos ajustes; botón de selección y presets para cada luz; retorno al panel de la luz seleccionada. Se mantiene la limitación de WebGL del navegador de QA indicada arriba.
+
+Prueba en el dispositivo: abrir Luces, seleccionar la segunda luz, pulsar Apuntar en la escena y tocar la pared. Confirmar cambio de iluminación y retorno a la segunda luz. Repetir con cámara bloqueada, cancelar sin elegir y tocar fondo vacío. Elegir Concentrado / Medio / Amplio y un ancho en metros; comprobar que solo cambia la apertura y el destino permanece fijo. Exportar y reabrir JSON.

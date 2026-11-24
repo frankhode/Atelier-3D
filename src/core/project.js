@@ -98,7 +98,7 @@ export function validateProject(input) {
         intensity: number(l.intensity, 0, 2000, "intensidad"),
         position: pos,
         target: aim,
-        angle: number(l.angle, 5, 85, "apertura"),
+        angle: number(l.angle, 0.5, 85, "apertura"),
         penumbra: number(l.penumbra, 0, 1, "suavidad"),
         shadows: bool(l.shadows, "sombras"),
       };

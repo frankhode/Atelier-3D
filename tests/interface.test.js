@@ -156,3 +156,59 @@ test("camera preserves scale across projections, uses orthogonal directions and 
   rig.controls.dispose();
   await f.window.happyDOM.close();
 });
+
+test("each light offers scene targeting and beam presets independently of direction", async () => {
+  const f = await fixture();
+  f.ui.focusLight(2);
+  assert.equal(
+    f.document.querySelector(".light-card[open]").dataset.light,
+    "2",
+  );
+  const button = f.document.querySelector(
+    '[data-action="aim-light"][data-value="2"]',
+  );
+  button.click();
+  assert.deepEqual(f.calls.at(-1), ["aim-light", "2", undefined]);
+  assert.equal(
+    f.document.querySelector('input[type="range"][data-path$=".angle"]'),
+    null,
+  );
+  const preset = f.document.querySelector(
+    '[data-action="beam-preset"][data-id="2"]',
+  );
+  preset.click();
+  assert.deepEqual(f.calls.at(-1), ["beam-preset", "8", "2"]);
+  const width = f.document.querySelector('[data-beam-width="2"]');
+  width.value = "3.5";
+  width.dispatchEvent(new f.window.Event("change", { bubbles: true }));
+  assert.deepEqual(f.calls.at(-1), ["beam-width", "3.5", "2"]);
+  await f.window.happyDOM.close();
+});
+test("aim mode frees the scene, announces the selected light and returns to its controls", async () => {
+  const f = await fixture();
+  f.ui.open("lights");
+  f.ui.setLightAiming(1);
+  assert.equal(f.document.getElementById("panel").hidden, true);
+  assert.equal(f.document.getElementById("light-aim-bar").hidden, false);
+  assert.ok(
+    f.document.getElementById("light-aim-name").textContent.includes("Luz 2"),
+  );
+  assert.equal(f.document.querySelector(".dock").inert, true);
+  assert.equal(f.document.activeElement.id, "cancel-light-aim");
+  f.ui.setLightAiming(null);
+  f.ui.focusLight(1);
+  assert.equal(f.document.querySelector(".dock").inert, false);
+  assert.equal(
+    f.document.querySelector(".light-card[open]").dataset.light,
+    "1",
+  );
+  f.ui.showLightTarget(1, { x: 120, y: 200, visible: true });
+  assert.equal(f.document.getElementById("light-target-marker").hidden, false);
+  assert.equal(
+    f.document.getElementById("light-target-marker").style.left,
+    "120px",
+  );
+  f.ui.hideLightTarget();
+  assert.equal(f.document.getElementById("light-target-marker").hidden, true);
+  await f.window.happyDOM.close();
+});

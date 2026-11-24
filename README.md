@@ -2,7 +2,7 @@
 
 Un taller web para preparar composiciones pictóricas figurativas: estudiar el encuadre, la perspectiva, la iluminación y el claroscuro sobre una escena neutra.
 
-Primera versión funcional, **0.1**. HTML, CSS y JavaScript modular con Three.js. Sitio estático, compatible con GitHub Pages, sin cuentas, backend, bases de datos, tokens de aplicación ni servicios pagos. Las dependencias quedan incluidas en el build; el navegador no carga bibliotecas desde un CDN.
+Versión **0.2**, con selección del destino de cada luz directamente en la escena. HTML, CSS y JavaScript modular con Three.js. Sitio estático, compatible con GitHub Pages, sin cuentas, backend, bases de datos, tokens de aplicación ni servicios pagos. Las dependencias quedan incluidas en el build; el navegador no carga bibliotecas desde un CDN.
 
 ## Uso
 
@@ -11,7 +11,7 @@ La escena ocupa la pantalla. La barra inferior abre **un panel por vez**; tocá 
 - **Navegar:** un dedo gira; dos dedos desplazan y acercan. Mouse: izquierdo gira, rueda acerca y derecho desplaza.
 - **Objetos:** importar uno o varios OBJ / GLB; mostrar y ocultar cada pieza o un modelo completo; buscar por nombre; ajustar posición, rotación, escala y unidades. Los archivos se **agregan** a la escena. No se centran, reescalan ni reflejan automáticamente. El botón Encuadrar muestra el modelo cuando sus coordenadas están lejos de la sala.
 - **Cámara:** perspectiva y ortogonal; frente, dorso, izquierda, derecha, superior e inferior; campo de visión, zoom, posición y objetivo. El candado bloquea navegación, óptica y comandos de vista. Desbloquear permite continuar. “Volver a la sala” recupera la cámara inicial y adapta la distancia al ancho de pantalla.
-- **Luces:** tres focos blancos independientes con intensidad, semiángulo, penumbra, posición, objetivo y sombras. Se pueden apagar individualmente. Ambiente y exposición permiten estudiar el contraste. Las guías muestran conos de luz, ejes y cuadrícula.
+- **Luces:** tres focos blancos independientes. “Apuntar en la escena” oculta los paneles y permite tocar una pared, un peldaño o cualquier modelo visible para elegir el destino. Una cruz indica el punto; “Ver punto” lo muestra nuevamente. Funciona con la cámara bloqueada; Cancelar / Escape conserva el destino anterior. El ancho del haz se ajusta por separado con Concentrado / Medio / Amplio o ingresando metros. El ángulo numérico queda en opciones avanzadas (0,5°–85° de semiángulo). Mantiene intensidad, borde suave, posición del origen, sombras, ambiente y exposición.
 - **Encuadre:** pantalla, 4:5, 5:4, 1:1, 3:2, 2:3 y 16:9; tercios opcionales; grises neutros, fondo y calidad. 4:5 equivale a un estudio vertical de 40 × 50 cm. Exporta PNG del encuadre a la resolución actual, sin interfaz ni guías.
 - **Archivo:** nombre, guardado local, exportación e importación de una composición JSON que contiene parámetros **y los modelos importados**. Abrir JSON reemplaza la composición actual solamente cuando todos sus modelos se pudieron procesar.
 
@@ -29,6 +29,17 @@ Los datos pertenecen a ese navegador y al origen del sitio. No se sincronizan en
 - **GLB:** binario glTF 2.0 autocontenido, sin compresión Draco / Meshopt / KTX2. Las superficies reciben el material neutro del taller; las cámaras y luces del archivo no reemplazan las del estudio. No se reproducen animaciones ni se editan poses. Evitá modelos con texturas grandes aunque luego no se utilicen: el cargador debe leerlas antes de descartarlas.
 - Límite de **32 MB por modelo**, **96 MB por proyecto JSON** y **100 modelos por composición**. El rendimiento depende de polígonos, texturas originales y memoria del dispositivo; estas cifras son límites de entrada, no una garantía de fluidez.
 - La unidad de trabajo es el metro. Los botones m / cm / mm establecen la conversión de escala. “Z arriba” rota −90° sobre X; no cambia la lateralidad.
+
+## Apuntar las luces
+
+1. Abrir **Luces** y desplegar la luz que quieras dirigir.
+2. Pulsar **Apuntar en la escena**. Se despeja la escena y la cámara queda temporalmente inmóvil.
+3. Tocar una superficie visible. El destino se actualiza, se muestra una cruz y vuelve el panel de esa misma luz. Tocar el fondo vacío no cambia nada; arrastrar o usar varios dedos tampoco elige un punto.
+4. Usar **Concentrado / Medio / Amplio** o **Ancho a esa distancia (m)** para variar el tamaño del haz. La dirección no cambia al modificar su ancho.
+
+El ancho se mide en un plano perpendicular al haz, a la distancia del destino; una pared oblicua recibe una mancha más alargada. Elegir un punto no elimina obstáculos: las sombras siguen dependiendo de la geometría entre la fuente y ese lugar. La luz apagada conserva el destino elegido y sigue apagada hasta que la actives.
+
+Para mayor precisión están **Ajuste preciso del punto** (XYZ en metros) y **Origen de la luz y ángulo preciso**. La cruz es una guía de interfaz: no aparece en el PNG. El destino y el ancho se conservan con el guardado local y los JSON existentes siguen siendo compatibles.
 
 ## Sala de referencia y orientación
 

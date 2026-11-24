@@ -5,6 +5,8 @@ import { readLocal, saveLocal, downloadFile } from "./core/storage.js";
 import { Viewport } from "./scene/renderer.js";
 import { CameraRig } from "./scene/camera-rig.js";
 import { Lighting } from "./scene/lighting.js";
+import { LightAimer, projectToCanvas } from "./scene/light-aimer.js";
+import { angleForDiameter, BEAM_PRESETS } from "./core/light-beam.js";
 import { ModelManager, recordFromFile } from "./scene/models.js";
 import { Interface } from "./ui/interface.js";
 
@@ -13,6 +15,8 @@ async function boot() {
   const state = local.project || defaultProject();
   let ui,
     saveTimer,
+    targetPreview = null,
+    targetTimer,
     busy = false,
     fallbackWarned = false;
   const viewport = new Viewport(document.getElementById("render-area"), state);
@@ -22,7 +26,66 @@ async function boot() {
     changed(),
   );
   viewport.onResize = (aspect) => rig.resize(aspect);
-  viewport.onRender = () => viewport.render(rig.camera);
+  viewport.onRender = () => {
+    viewport.render(rig.camera);
+    updateTargetMarker();
+  };
+  const aimer = new LightAimer(viewport.renderer.domElement, rig, models, {
+    onStart(index) {
+      ui.setLightAiming(index);
+      previewTarget(index, true);
+    },
+    onMiss() {
+      ui.notify("Tocá una superficie de la escena, no el fondo vacío.");
+    },
+    onPick(index, point) {
+      const previous = state.lights[index].target;
+      state.lights[index].target = point;
+      try {
+        validateProject(state);
+      } catch {
+        state.lights[index].target = previous;
+        ui.notify("Elegí un punto distinto del origen de la luz.");
+        return false;
+      }
+      lighting.apply();
+      changed();
+      previewTarget(index);
+      ui.notify(
+        state.lights[index].enabled
+          ? `Punto de luz ${index + 1} actualizado.`
+          : "Punto actualizado. Esta luz está apagada.",
+      );
+      return true;
+    },
+    onEnd(index, picked) {
+      ui.setLightAiming(null);
+      ui.focusLight(index);
+      if (!picked) hideTargetMarker();
+    },
+  });
+  function updateTargetMarker() {
+    if (!targetPreview || !ui) return;
+    ui.showLightTarget(
+      targetPreview.index,
+      projectToCanvas(
+        targetPreview.point,
+        rig.camera,
+        viewport.renderer.domElement,
+      ),
+    );
+  }
+  function hideTargetMarker() {
+    clearTimeout(targetTimer);
+    targetPreview = null;
+    ui?.hideLightTarget();
+  }
+  function previewTarget(index, permanent = false) {
+    clearTimeout(targetTimer);
+    targetPreview = { index, point: state.lights[index].target.slice() };
+    updateTargetMarker();
+    if (!permanent) targetTimer = setTimeout(hideTargetMarker, 6500);
+  }
   function save() {
     clearTimeout(saveTimer);
     rig.capture();
@@ -55,6 +118,8 @@ async function boot() {
   }
   function apply(path) {
     validateProject(state);
+    if (targetPreview && path.startsWith(`lights.${targetPreview.index}.`))
+      targetPreview.point = state.lights[targetPreview.index].target.slice();
     if (path.startsWith("camera.")) {
       rig.restore();
       if (path === "camera.locked") ui.refresh();
@@ -96,6 +161,8 @@ async function boot() {
       ui.notify("Esperá a que termine la importación actual.");
       return;
     }
+    aimer.cancel();
+    hideTargetMarker();
     busy = true;
     document.getElementById("loading").hidden = false;
     try {
@@ -156,7 +223,43 @@ async function boot() {
         viewport.resize();
         ui.refresh();
         changed();
+      } else if (name === "aim-light") {
+        const index = Number(value);
+        if (Number.isInteger(index) && state.lights[index]) aimer.start(index);
+      } else if (name === "show-light-target") {
+        const index = Number(value);
+        if (!Number.isInteger(index) || !state.lights[index]) return;
+        ui.open(null);
+        previewTarget(index);
+        if (
+          !projectToCanvas(
+            state.lights[index].target,
+            rig.camera,
+            viewport.renderer.domElement,
+          ).visible
+        )
+          ui.notify(
+            "El punto está fuera del encuadre. Usá Apuntar en la escena para elegir uno visible.",
+          );
+      } else if (name === "beam-preset" || name === "beam-width") {
+        const index = Number(id),
+          light = state.lights[index];
+        if (!Number.isInteger(index) || !light) return;
+        try {
+          const angle =
+            name === "beam-width"
+              ? angleForDiameter(light, Number(value))
+              : BEAM_PRESETS.find((p) => p.angle === Number(value))?.angle;
+          if (angle === undefined) return;
+          light.angle = angle;
+          lighting.apply();
+          changed();
+        } catch (error) {
+          ui.notify(error.message);
+        }
+        ui.focusLight(index);
       } else if (name === "reset-lights") {
+        hideTargetMarker();
         state.lights = defaultProject().lights;
         lighting.apply();
         ui.refresh();
@@ -213,6 +316,7 @@ async function boot() {
     },
   };
   ui = new Interface(state, models, actions);
+  document.getElementById("cancel-light-aim").onclick = () => aimer.cancel();
   document.getElementById("model-input").addEventListener("change", (event) => {
     const files = [...event.target.files];
     event.target.value = "";
@@ -263,11 +367,14 @@ async function boot() {
         ui.notify("Composición abierta.");
       });
     });
-  viewport.onContextLost = () =>
+  viewport.onContextLost = () => {
+    aimer.cancel();
+    hideTargetMarker();
     ui.notify(
       "Se interrumpió la vista 3D. Esperando que el navegador recupere el contexto…",
       12000,
     );
+  };
   viewport.onContextRestored = () => {
     lighting.apply();
     viewport.requestRender();

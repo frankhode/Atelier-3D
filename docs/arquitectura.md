@@ -1,4 +1,4 @@
-# Arquitectura · Atelier 3D 0.1
+# Arquitectura · Atelier 3D 0.2
 
 ## Responsabilidades
 
@@ -9,6 +9,8 @@
 | `src/core/storage.js` | Guardado local con alternativa ante falta de cuota, recuperación y descargas. |
 | `src/scene/renderer.js` | WebGL, espacio de encuadre, resolución y renderizado bajo demanda. |
 | `src/scene/camera-rig.js` | Dos cámaras, navegación, vistas ortogonales, conservación de escala al cambiar de proyección, encuadre y bloqueo. |
+| `src/core/light-beam.js` | Conversión entre semiángulo y diámetro a la distancia del destino; presets del haz. |
+| `src/scene/light-aimer.js` | Selección por rayo sobre superficies visibles; tap frente a arrastre/multitoque, bloqueo temporal de navegación y proyección del marcador. |
 | `src/scene/lighting.js` | Tres focos, sombras, ambiente y guías. |
 | `src/scene/models.js` | Importación OBJ/GLB, material neutro, piezas, transformaciones, descarte de recursos y preparación transaccional de un proyecto. |
 | `src/ui/interface.js` | Paneles, controles accesibles, búsqueda, estado y notificaciones; emite acciones sobre el dominio. |
@@ -44,3 +46,11 @@ La pérdida del contexto WebGL se comunica y se intenta continuar cuando el nave
 ## Límites deliberados
 
 La iluminación usa focos y mapas de sombra; no es un trazador de rayos ni calcula iluminación global o rebotes. “Borde suave” controla la penumbra del cono, no la difusión física de una fuente de área. La luz ambiente es uniforme y no proyecta sombras. Las vistas ortogonales son puntos de partida que pueden girarse nuevamente al navegar. No hay edición de mallas, poses, animación, texturas ni sincronización entre dispositivos.
+
+## Selección del destino de una luz
+
+`LightAimer` calcula el rayo a partir del rectángulo real del canvas, incluyendo la posición de un encuadre fijo. Solo participan mallas de modelos con todos sus ancestros visibles. Se toma la intersección más cercana, también con cámara ortogonal. Los helpers nunca participan.
+
+Durante la selección se desactiva OrbitControls, conservando su estado y el bloqueo permanente de cámara. Solo un tap de un puntero sin arrastre elige el destino. Multitoque, cancelación del puntero, tocar fuera del canvas o fondo vacío no modifican el proyecto. Escape o Cancelar restauran la navegación previa. El estado de selección es efímero; solo `lights[i].target` y `angle` se persisten.
+
+El marcador es DOM, se proyecta al renderizar y queda fuera de las exportaciones PNG. `beamDiameter = 2 × distancia × tan(semiángulo)` permite presentar el tamaño en metros; modificarlo preserva posición y destino. Los proyectos v1 anteriores se leen sin migración; el límite inferior de semiángulo se amplía a 0,5° para haces más pequeños.
