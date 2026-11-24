@@ -3,6 +3,7 @@ export class Lighting {
   constructor(scene, state) {
     this.scene = scene;
     this.state = state;
+    this.soloIndex = null;
     this.ambient = new THREE.AmbientLight(0xffffff, 0.12);
     scene.add(this.ambient);
     this.lights = state.lights.map(() => {
@@ -27,12 +28,23 @@ export class Lighting {
     scene.add(this.grid);
     this.apply();
   }
+  setSolo(index) {
+    if (
+      index !== null &&
+      (!Number.isInteger(index) || !this.state.lights[index])
+    )
+      return;
+    this.soloIndex = index;
+    this.apply();
+  }
   apply() {
-    this.ambient.intensity = this.state.appearance.ambient;
+    this.ambient.intensity =
+      this.soloIndex === null ? this.state.appearance.ambient : 0;
     const mapSize = this.state.appearance.quality === "high" ? 2048 : 1024;
     this.lights.forEach((light, i) => {
       const s = this.state.lights[i];
-      light.visible = s.enabled;
+      light.visible =
+        s.enabled && (this.soloIndex === null || this.soloIndex === i);
       light.intensity = s.intensity;
       light.position.fromArray(s.position);
       light.target.position.fromArray(s.target);
@@ -46,7 +58,7 @@ export class Lighting {
       }
       light.target.updateMatrixWorld();
       light.updateMatrixWorld();
-      this.helpers[i].visible = this.state.appearance.helpers && s.enabled;
+      this.helpers[i].visible = this.state.appearance.helpers && light.visible;
       this.helpers[i].update();
     });
     this.axes.visible = this.grid.visible = this.state.appearance.helpers;

@@ -1185,3 +1185,20 @@ body.aiming-light .view-tools {
     bottom: calc(116px + env(safe-area-inset-bottom));
   }
 }
+
+.solo-badge {
+  border-color: #d6bd8080;
+  color: #ffe2a1;
+  background: #29291fe8;
+  white-space: nowrap;
+}
+.light-origin-controls {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 8px;
+  margin-bottom: 18px;
+}
+.light-content > .button.active {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: #c5d9d220;
+}

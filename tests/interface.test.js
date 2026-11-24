@@ -212,3 +212,39 @@ test("aim mode frees the scene, announces the selected light and returns to its 
   assert.equal(f.document.getElementById("light-target-marker").hidden, true);
   await f.window.happyDOM.close();
 });
+
+test("concentration is explicit, defaults on, and can be disabled without changing saved lights", async () => {
+  const f = await fixture(),
+    before = JSON.stringify(f.state.lights);
+  f.ui.focusLight(0);
+  const checkbox = f.document.querySelector('[data-concentrate="0"]');
+  assert.equal(checkbox.checked, true);
+  checkbox.checked = false;
+  checkbox.dispatchEvent(new f.window.Event("input", { bubbles: true }));
+  assert.equal(f.ui.concentrateOnAim[0], false);
+  assert.equal(JSON.stringify(f.state.lights), before);
+  f.ui.focusLight(0);
+  assert.equal(
+    f.document.querySelector('[data-concentrate="0"]').checked,
+    false,
+  );
+  await f.window.happyDOM.close();
+});
+test("solo has a visible exit and each light offers moving its origin from the current view", async () => {
+  const f = await fixture();
+  f.ui.setSoloLight(2);
+  f.ui.focusLight(2);
+  assert.equal(f.document.querySelector("#lighting-solo").hidden, false);
+  assert.ok(
+    f.document.querySelector("#lighting-solo").textContent.includes("3"),
+  );
+  f.document
+    .querySelector('[data-action="light-from-view"][data-value="2"]')
+    .click();
+  assert.deepEqual(f.calls.at(-1), ["light-from-view", "2", undefined]);
+  f.document.querySelector("#lighting-solo").click();
+  assert.deepEqual(f.calls.at(-1), ["solo-light", "clear"]);
+  f.ui.setSoloLight(null);
+  assert.equal(f.document.querySelector("#lighting-solo").hidden, true);
+  await f.window.happyDOM.close();
+});

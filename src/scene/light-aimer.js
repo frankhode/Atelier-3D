@@ -2,6 +2,12 @@ import * as THREE from "three";
 
 // Only actual, visible model surfaces participate. Guides and hidden ancestors do not.
 export function pickSurface(clientX, clientY, canvas, camera, models) {
+  return (
+    pickSurfaceHit(clientX, clientY, canvas, camera, models)?.point ?? null
+  );
+}
+
+export function pickSurfaceHit(clientX, clientY, canvas, camera, models) {
   const rect = canvas.getBoundingClientRect();
   if (
     rect.width <= 0 ||
@@ -16,6 +22,28 @@ export function pickSurface(clientX, clientY, canvas, camera, models) {
     ((clientX - rect.left) / rect.width) * 2 - 1,
     (-(clientY - rect.top) / rect.height) * 2 + 1,
   );
+  const meshes = visibleModelMeshes(models);
+  camera.updateMatrixWorld(true);
+  const ray = new THREE.Raycaster();
+  ray.setFromCamera(point, camera);
+  const hit = ray.intersectObjects(meshes, false)[0];
+  if (!hit) return null;
+  const matrix = hit.object.matrixWorld.clone();
+  if (hit.object.isInstancedMesh && hit.instanceId !== undefined) {
+    const instance = new THREE.Matrix4();
+    hit.object.getMatrixAt(hit.instanceId, instance);
+    matrix.multiply(instance);
+  }
+  hit.worldNormal =
+    hit.face?.normal
+      .clone()
+      .applyNormalMatrix(new THREE.Matrix3().getNormalMatrix(matrix))
+      .normalize()
+      .toArray() ?? null;
+  return hit;
+}
+
+export function visibleModelMeshes(models) {
   const meshes = [];
   for (const entry of models.entries.values()) {
     entry.wrapper.updateWorldMatrix(true, true);
@@ -29,10 +57,24 @@ export function pickSurface(clientX, clientY, canvas, camera, models) {
       if (visible) meshes.push(object.mesh);
     }
   }
-  camera.updateMatrixWorld(true);
-  const ray = new THREE.Raycaster();
-  ray.setFromCamera(point, camera);
-  return ray.intersectObjects(meshes, false)[0]?.point ?? null;
+  return meshes;
+}
+
+// Ignore the receiving surface at the very end of the ray, but retain real occluders.
+export function findLightBlocker(light, models) {
+  const origin = new THREE.Vector3(...light.position);
+  const direction = new THREE.Vector3(...light.target).sub(origin);
+  const distance = direction.length();
+  if (distance <= 0.04) return null;
+  const ray = new THREE.Raycaster(
+    origin,
+    direction.normalize(),
+    0.01,
+    distance - 0.025,
+  );
+  return (
+    ray.intersectObjects(visibleModelMeshes(models), false)[0]?.object ?? null
+  );
 }
 
 export function projectToCanvas(point, camera, canvas) {
@@ -99,7 +141,7 @@ export class LightAimer {
         Math.hypot(event.clientX - gesture.x, event.clientY - gesture.y) > 8
       )
         return;
-      const hit = pickSurface(
+      const hit = pickSurfaceHit(
         event.clientX,
         event.clientY,
         this.canvas,
@@ -110,7 +152,13 @@ export class LightAimer {
         this.callbacks.onMiss?.();
         return;
       }
-      if (this.callbacks.onPick(this.index, hit.toArray()) !== false)
+      if (
+        this.callbacks.onPick(
+          this.index,
+          hit.point.toArray(),
+          hit.worldNormal,
+        ) !== false
+      )
         this.finish(true);
     };
     this.cancelGesture = (event) => {

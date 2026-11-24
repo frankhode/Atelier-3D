@@ -5,7 +5,12 @@ import { readLocal, saveLocal, downloadFile } from "./core/storage.js";
 import { Viewport } from "./scene/renderer.js";
 import { CameraRig } from "./scene/camera-rig.js";
 import { Lighting } from "./scene/lighting.js";
-import { LightAimer, projectToCanvas } from "./scene/light-aimer.js";
+import {
+  LightAimer,
+  projectToCanvas,
+  findLightBlocker,
+} from "./scene/light-aimer.js";
+import { aimLight, lightFromView } from "./scene/light-controls.js";
 import { angleForDiameter, BEAM_PRESETS } from "./core/light-beam.js";
 import { ModelManager, recordFromFile } from "./scene/models.js";
 import { Interface } from "./ui/interface.js";
@@ -38,24 +43,21 @@ async function boot() {
     onMiss() {
       ui.notify("Tocá una superficie de la escena, no el fondo vacío.");
     },
-    onPick(index, point) {
-      const previous = state.lights[index].target;
-      state.lights[index].target = point;
+    onPick(index, point, normal) {
+      const light = state.lights[index];
+      const previous = { target: light.target, angle: light.angle };
       try {
+        aimLight(light, point, ui.concentrateOnAim[index], normal);
         validateProject(state);
-      } catch {
-        state.lights[index].target = previous;
-        ui.notify("Elegí un punto distinto del origen de la luz.");
+      } catch (error) {
+        Object.assign(light, previous);
+        ui.notify(error.message);
         return false;
       }
       lighting.apply();
       changed();
       previewTarget(index);
-      ui.notify(
-        state.lights[index].enabled
-          ? `Punto de luz ${index + 1} actualizado.`
-          : "Punto actualizado. Esta luz está apagada.",
-      );
+      describeLightPath(index, previous.angle > light.angle);
       return true;
     },
     onEnd(index, picked) {
@@ -85,6 +87,20 @@ async function boot() {
     targetPreview = { index, point: state.lights[index].target.slice() };
     updateTargetMarker();
     if (!permanent) targetTimer = setTimeout(hideTargetMarker, 6500);
+  }
+  function describeLightPath(index, concentrated = false) {
+    const light = state.lights[index];
+    const blocker = light.shadows ? findLightBlocker(light, models) : null;
+    if (!light.enabled) ui.notify("Punto actualizado. Esta luz está apagada.");
+    else if (blocker)
+      ui.notify(
+        `El recorrido hacia ese punto está bloqueado por ${blocker.name.replaceAll("_", " ")}. Probá Luz desde esta vista.`,
+        10000,
+      );
+    else
+      ui.notify(
+        `Punto de luz ${index + 1} actualizado${concentrated ? " con haz concentrado" : ""}.`,
+      );
   }
   function save() {
     clearTimeout(saveTimer);
@@ -140,6 +156,8 @@ async function boot() {
     const staged = await models.prepareProject(next);
     models.clear();
     Object.assign(state, next);
+    lighting.setSolo(null);
+    ui.setSoloLight(null);
     staged.forEach((entry) => models.mount(entry));
     rig.restore();
     lighting.apply();
@@ -241,6 +259,38 @@ async function boot() {
           ui.notify(
             "El punto está fuera del encuadre. Usá Apuntar en la escena para elegir uno visible.",
           );
+      } else if (name === "solo-light") {
+        const index = value === "clear" ? null : Number(value);
+        if (
+          index !== null &&
+          (!Number.isInteger(index) || !state.lights[index])
+        )
+          return;
+        const next = index === lighting.soloIndex ? null : index;
+        lighting.setSolo(next);
+        ui.setSoloLight(next);
+        if (ui.activePanel === "lights") ui.focusLight(ui.selectedLight);
+        viewport.requestRender();
+        if (next !== null && !state.lights[next].enabled)
+          ui.notify("Esta luz está apagada. Encendela para verla sola.");
+      } else if (name === "light-from-view") {
+        const index = Number(value),
+          light = state.lights[index];
+        if (!Number.isInteger(index) || !light) return;
+        const previous = { position: light.position, angle: light.angle };
+        try {
+          lightFromView(light, rig.camera);
+          validateProject(state);
+        } catch (error) {
+          Object.assign(light, previous);
+          ui.notify(error.message);
+          return;
+        }
+        lighting.apply();
+        changed();
+        previewTarget(index);
+        ui.focusLight(index);
+        describeLightPath(index);
       } else if (name === "beam-preset" || name === "beam-width") {
         const index = Number(id),
           light = state.lights[index];
@@ -261,7 +311,8 @@ async function boot() {
       } else if (name === "reset-lights") {
         hideTargetMarker();
         state.lights = defaultProject().lights;
-        lighting.apply();
+        lighting.setSolo(null);
+        ui.setSoloLight(null);
         ui.refresh();
         changed();
       } else if (name === "export") {

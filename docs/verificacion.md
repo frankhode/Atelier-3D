@@ -48,3 +48,13 @@ Los workflows verifican tests/build y preparan `dist/` para Pages. La configurac
 Se agregan pruebas de selección real por rayos con cámaras perspectiva y ortogonal; coordenadas del canvas desplazado; exclusión de mallas, ancestros y modelos ocultos; intersección más cercana; marcador dentro/fuera del encuadre; tap, fondo vacío, arrastre, multitoque, pointercancel y Escape; preservación del bloqueo de cámara; rechazo de un destino no aplicable; equivalencia entre diámetro y ángulo; persistencia JSON de los nuevos ajustes; botón de selección y presets para cada luz; retorno al panel de la luz seleccionada. Se mantiene la limitación de WebGL del navegador de QA indicada arriba.
 
 Prueba en el dispositivo: abrir Luces, seleccionar la segunda luz, pulsar Apuntar en la escena y tocar la pared. Confirmar cambio de iluminación y retorno a la segunda luz. Repetir con cámara bloqueada, cancelar sin elegir y tocar fondo vacío. Elegir Concentrado / Medio / Amplio y un ancho en metros; comprobar que solo cambia la apertura y el destino permanece fijo. Exportar y reabrir JSON.
+
+## Regresión 0.2.1: aparente dirección fija hacia la pared del fondo
+
+El OBJ real reproduce que distintos puntos de la pared ya están dentro del cono inicial ancho. La orientación del foco cambia correctamente, pero se ilumina una región similar; además las sombras conservan las direcciones geométricas propias del origen fijo. A incidencia rasante, el preset de 8° todavía puede abarcar gran parte de la pared.
+
+Se prueba el recorrido completo de geometría y parámetros con varios puntos reales de `Muro_fondo`, normales mundiales, el módulo `WebGLLights` de Three.js usado por el renderer y las matrices reales de las cámaras de sombra. Las pruebas comprueban que el destino llega a los uniforms correctos, que la concentración excluye otros puntos separados de la misma pared y que el origen no cambia al apuntar. Esta prueba no requiere contexto gráfico y no equivale a inspeccionar píxeles renderizados.
+
+También se verifica Solo temporal sin mutaciones en el JSON, restauración del ambiente y de fuentes desactivadas, colocación del origen desde la cámara, conservación del ancho, detección de obstáculos reales, exclusión de obstáculos ocultos y opción visible para conservar el ancho al apuntar.
+
+Aceptación en Android: elegir la luz principal, activar Ver solo esta luz, mantener Concentrar al apuntar y tocar dos zonas distintas de la pared. Comprobar desplazamiento de la mancha. Pulsar Luz desde esta vista para cambiar la incidencia y la dirección de las sombras. Salir de Solo con el botón superior. No borrar datos del navegador para actualizar: basta recargar la página.

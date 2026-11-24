@@ -1,4 +1,4 @@
-# Arquitectura · Atelier 3D 0.2
+# Arquitectura · Atelier 3D 0.2.1
 
 ## Responsabilidades
 
@@ -11,6 +11,7 @@
 | `src/scene/camera-rig.js` | Dos cámaras, navegación, vistas ortogonales, conservación de escala al cambiar de proyección, encuadre y bloqueo. |
 | `src/core/light-beam.js` | Conversión entre semiángulo y diámetro a la distancia del destino; presets del haz. |
 | `src/scene/light-aimer.js` | Selección por rayo sobre superficies visibles; tap frente a arrastre/multitoque, bloqueo temporal de navegación y proyección del marcador. |
+| `src/scene/light-controls.js` | Aplicación del destino con concentración según la normal de la superficie; posición de origen desde la cámara conservando el ancho. |
 | `src/scene/lighting.js` | Tres focos, sombras, ambiente y guías. |
 | `src/scene/models.js` | Importación OBJ/GLB, material neutro, piezas, transformaciones, descarte de recursos y preparación transaccional de un proyecto. |
 | `src/ui/interface.js` | Paneles, controles accesibles, búsqueda, estado y notificaciones; emite acciones sobre el dominio. |
@@ -54,3 +55,11 @@ La iluminación usa focos y mapas de sombra; no es un trazador de rayos ni calcu
 Durante la selección se desactiva OrbitControls, conservando su estado y el bloqueo permanente de cámara. Solo un tap de un puntero sin arrastre elige el destino. Multitoque, cancelación del puntero, tocar fuera del canvas o fondo vacío no modifican el proyecto. Escape o Cancelar restauran la navegación previa. El estado de selección es efímero; solo `lights[i].target` y `angle` se persisten.
 
 El marcador es DOM, se proyecta al renderizar y queda fuera de las exportaciones PNG. `beamDiameter = 2 × distancia × tan(semiángulo)` permite presentar el tamaño en metros; modificarlo preserva posición y destino. Los proyectos v1 anteriores se leen sin migración; el límite inferior de semiángulo se amplía a 0,5° para haces más pequeños.
+
+## Diferenciar orientación, apertura y origen (0.2.1)
+
+La selección devuelve también la normal de la superficie en coordenadas mundiales, incluyendo transformaciones de instancias. Concentrar al apuntar reduce el haz sobre el destino y compensa su elongación a incidencia rasante con el factor absoluto normal·dirección. No mueve el origen. El límite de semiángulo sigue siendo 0,5°; por eso el diámetro superficial es aproximado en situaciones extremas. La opción de concentración es explícita y temporal por luz.
+
+El modo Solo es una propiedad temporal del módulo de iluminación. Oculta otras luces y ambiente al renderizar, sin tocar los booleanos guardados del documento. Tiene una salida visible fuera del panel. Cargar otra composición o restablecer luces sale del modo.
+
+Mover origen desde la cámara conserva destino y ancho perpendicular aproximado y actualiza el estado persistido. El diagnóstico del recorrido usa un rayo entre fuente y destino contra mallas visibles; excluye el último tramo para no informar la superficie receptora como un obstáculo. Solo se informa obstrucción cuando esa fuente proyecta sombras.

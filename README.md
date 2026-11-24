@@ -2,7 +2,7 @@
 
 Un taller web para preparar composiciones pictóricas figurativas: estudiar el encuadre, la perspectiva, la iluminación y el claroscuro sobre una escena neutra.
 
-Versión **0.2**, con selección del destino de cada luz directamente en la escena. HTML, CSS y JavaScript modular con Three.js. Sitio estático, compatible con GitHub Pages, sin cuentas, backend, bases de datos, tokens de aplicación ni servicios pagos. Las dependencias quedan incluidas en el build; el navegador no carga bibliotecas desde un CDN.
+Versión **0.2.1**, con selección del destino de cada luz directamente en la escena. HTML, CSS y JavaScript modular con Three.js. Sitio estático, compatible con GitHub Pages, sin cuentas, backend, bases de datos, tokens de aplicación ni servicios pagos. Las dependencias quedan incluidas en el build; el navegador no carga bibliotecas desde un CDN.
 
 ## Uso
 
@@ -34,8 +34,14 @@ Los datos pertenecen a ese navegador y al origen del sitio. No se sincronizan en
 
 1. Abrir **Luces** y desplegar la luz que quieras dirigir.
 2. Pulsar **Apuntar en la escena**. Se despeja la escena y la cámara queda temporalmente inmóvil.
-3. Tocar una superficie visible. El destino se actualiza, se muestra una cruz y vuelve el panel de esa misma luz. Tocar el fondo vacío no cambia nada; arrastrar o usar varios dedos tampoco elige un punto.
+3. Dejar activado **Concentrar al apuntar** y tocar una superficie visible. El destino se actualiza, se muestra una cruz y vuelve el panel de esa misma luz. La apertura se reduce para distinguir la mancha; también se compensa la incidencia oblicua sobre la superficie. Desactivar Concentrar conserva el ancho existente. Tocar el fondo vacío no cambia nada; arrastrar o usar varios dedos tampoco elige un punto.
 4. Usar **Concentrado / Medio / Amplio** o **Ancho a esa distancia (m)** para variar el tamaño del haz. La dirección no cambia al modificar su ancho.
+
+**Ver solo esta luz** permite comparar su efecto sin las otras fuentes ni el ambiente. Es una vista temporal: no cambia qué luces quedaron encendidas en el proyecto. El botón superior **Solo luz … · Salir** vuelve a la iluminación completa. El PNG reproduce la vista actual; el JSON conserva los parámetros del proyecto, sin el modo de comparación.
+
+**Luz desde esta vista** coloca el origen en la posición actual de la cámara, conserva el destino y mantiene aproximadamente el ancho a esa distancia. Sirve para dirigir una luz desde el frente de la composición. No mueve la cámara, incluso si está bloqueada. Si el recorrido hasta el destino está obstruido, se informa el objeto que lo bloquea.
+
+Cambiar el destino orienta el cono, pero **la dirección de las sombras depende de dónde está la fuente**. Con un haz amplio, cambiar el destino puede dejar iluminada casi toda la misma pared. Concentrar, aislar la luz y mover su origen permiten distinguir esas tres cosas.
 
 El ancho se mide en un plano perpendicular al haz, a la distancia del destino; una pared oblicua recibe una mancha más alargada. Elegir un punto no elimina obstáculos: las sombras siguen dependiendo de la geometría entre la fuente y ese lugar. La luz apagada conserva el destino elegido y sigue apagada hasta que la actives.
 

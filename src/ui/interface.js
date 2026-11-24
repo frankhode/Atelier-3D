@@ -30,6 +30,8 @@ export class Interface {
     this.actions = actions;
     this.activePanel = null;
     this.selectedLight = 0;
+    this.concentrateOnAim = [true, true, true];
+    this.soloLight = null;
     this.panel = document.getElementById("panel");
     this.body = document.getElementById("panel-body");
     hydrateIcons();
@@ -50,6 +52,8 @@ export class Interface {
       this.refresh();
     };
     document.getElementById("fit-camera").onclick = () => actions.fit();
+    document.getElementById("lighting-solo").onclick = () =>
+      actions.action("solo-light", "clear");
     document.getElementById("help-button").onclick = () =>
       document.getElementById("help-dialog").showModal();
     document.getElementById("close-help").onclick = () =>
@@ -169,6 +173,12 @@ export class Interface {
       ?.querySelector('[data-action="aim-light"]')
       ?.focus({ preventScroll: true });
   }
+  setSoloLight(index) {
+    this.soloLight = index;
+    const badge = document.getElementById("lighting-solo");
+    badge.hidden = index === null;
+    badge.textContent = index === null ? "" : `Solo luz ${index + 1} · Salir`;
+  }
   setLightAiming(index) {
     const active = index !== null;
     document.body.classList.toggle("aiming-light", active);
@@ -198,6 +208,10 @@ export class Interface {
   }
   handleInput(event) {
     const el = event.target;
+    if (el.dataset.concentrate !== undefined) {
+      this.concentrateOnAim[Number(el.dataset.concentrate)] = el.checked;
+      return;
+    }
     if (el.dataset.beamWidth !== undefined) {
       if (event.type === "change" && el.value !== "" && el.checkValidity())
         this.actions.action("beam-width", el.value, el.dataset.beamWidth);
@@ -336,12 +350,20 @@ export class Interface {
       <summary><span class="light-number">${i + 1}</span><span>${esc(light.name)}</span></summary>
       <div class="light-content">
         ${this.toggle(`lights.${i}.enabled`, "Luz encendida")}
+        <button class="button full ${this.soloLight === i ? "active" : ""}" data-action="solo-light" data-value="${i}" aria-pressed="${this.soloLight === i}">${icon("eye")}${this.soloLight === i ? "Mostrar todas las luces" : "Ver solo esta luz"}</button>
+        ${this.soloLight === i ? '<p class="hint">Vista temporal: solo esta luz, sin ambiente. Podés salir con el botón superior.</p>' : ""}
         <div class="light-target-controls">
           <h3 class="section-title">Hacia dónde ilumina</h3>
+          <label class="toggle-row"><span>Concentrar al apuntar</span><input type="checkbox" data-concentrate="${i}" aria-label="Concentrar luz ${i + 1} al apuntar" ${this.concentrateOnAim[i] ? "checked" : ""}></label>
           <button class="button primary full" data-action="aim-light" data-value="${i}">${icon("target")}Apuntar en la escena</button>
-          <p class="hint">Tocá una pared, un peldaño o un objeto.</p>
+          <p class="hint">Tocá una superficie. Con Concentrar, el haz se reduce a un máximo aproximado de 1,50 m para distinguir el destino; después podés ampliarlo.</p>
           <div class="target-summary"><span data-target-summary="${i}">${esc(this.targetSummary(light))}</span><button class="button" data-action="show-light-target" data-value="${i}" aria-label="Ver punto de luz ${i + 1}">${icon("eye")}Ver punto</button></div>
           <details class="advanced"><summary>Ajuste preciso del punto</summary>${this.triple(`lights.${i}.target`, "Punto iluminado (m)")}</details>
+        </div>
+        <div class="light-origin-controls">
+          <h3 class="section-title">Desde dónde llega</h3>
+          <button class="button full" data-action="light-from-view" data-value="${i}">${icon("camera")}Luz desde esta vista</button>
+          <p class="hint">Mueve el origen a la cámara. Cambia el recorrido de la luz y de las sombras.</p>
         </div>
         ${this.range(`lights.${i}.intensity`, "Intensidad", 0, 500, 1, " cd")}
         <h3 class="section-title">Ancho del haz</h3>
@@ -382,7 +404,7 @@ export class Interface {
       )}</select></label><label class="color-row">Fondo<input type="color" aria-label="Color del fondo" data-path="appearance.background" value="${this.state.appearance.background}"></label><label class="field"><span class="field-label">Calidad</span><select data-path="appearance.quality" aria-label="Calidad de renderizado"><option value="balanced" ${this.state.appearance.quality === "balanced" ? "selected" : ""}>Equilibrada · móvil</option><option value="high" ${this.state.appearance.quality === "high" ? "selected" : ""}>Alta · sombras 2048</option></select></label></div><button class="button primary full" data-action="png">${icon("image")}Exportar imagen PNG</button><p class="hint">Imagen del encuadre a la resolución actual, sin controles ni guías.</p>`;
   }
   project() {
-    return `<div class="section"><label class="field"><span class="field-label">Nombre de la composición</span><input type="text" aria-label="Nombre de la composición" data-path="title" value="${esc(this.state.title)}" maxlength="100"></label><div class="measure"><span>Guardado</span><strong>En este navegador</strong></div><p class="hint">Los parámetros se guardan automáticamente. Los modelos también, cuando hay espacio. Conservá una copia JSON para trasladar o recuperar el trabajo.</p></div><div class="section"><h3 class="section-title">Composición portable</h3><button class="button primary full" data-action="export">${icon("export")}Exportar JSON con modelos</button><button class="button full" data-action="import-project">${icon("import")}Abrir composición JSON</button><p class="hint">El JSON incluye cámara, encuadre, luces, visibilidad y los OBJ / GLB importados. Abrir un proyecto reemplaza la composición actual.</p></div><div class="section"><button class="button full" data-action="save">${icon("folder")}Guardar ahora</button><button class="button danger full" data-action="reset">${icon("reset")}Restablecer escena de prueba</button></div><div class="measure"><span>Atelier 3D</span><strong>v0.2</strong></div><p class="hint">Todo el procesamiento ocurre en tu dispositivo. Los archivos importados no se envían a ningún servidor.</p>`;
+    return `<div class="section"><label class="field"><span class="field-label">Nombre de la composición</span><input type="text" aria-label="Nombre de la composición" data-path="title" value="${esc(this.state.title)}" maxlength="100"></label><div class="measure"><span>Guardado</span><strong>En este navegador</strong></div><p class="hint">Los parámetros se guardan automáticamente. Los modelos también, cuando hay espacio. Conservá una copia JSON para trasladar o recuperar el trabajo.</p></div><div class="section"><h3 class="section-title">Composición portable</h3><button class="button primary full" data-action="export">${icon("export")}Exportar JSON con modelos</button><button class="button full" data-action="import-project">${icon("import")}Abrir composición JSON</button><p class="hint">El JSON incluye cámara, encuadre, luces, visibilidad y los OBJ / GLB importados. Abrir un proyecto reemplaza la composición actual.</p></div><div class="section"><button class="button full" data-action="save">${icon("folder")}Guardar ahora</button><button class="button danger full" data-action="reset">${icon("reset")}Restablecer escena de prueba</button></div><div class="measure"><span>Atelier 3D</span><strong>v0.2.1</strong></div><p class="hint">Todo el procesamiento ocurre en tu dispositivo. Los archivos importados no se envían a ningún servidor.</p>`;
   }
   notify(message, duration = 6500) {
     clearTimeout(this.toastTimer);
