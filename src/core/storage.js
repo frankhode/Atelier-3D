@@ -1,9 +1,9 @@
 import { serializeProject, validateProject } from "./project.js";
 export const STORAGE_KEY = "atelier3d:composition:v1";
-export function readLocal(storage) {
+export function readLocal(storage, key = STORAGE_KEY) {
   try {
     storage ??= globalThis.localStorage;
-    const data = storage.getItem(STORAGE_KEY);
+    const data = storage.getItem(key);
     return data
       ? { project: validateProject(JSON.parse(data)), error: null }
       : { project: null, error: null };
@@ -11,14 +11,14 @@ export function readLocal(storage) {
     return { project: null, error };
   }
 }
-export function saveLocal(project, storage) {
+export function saveLocal(project, storage, key = STORAGE_KEY) {
   try {
     storage ??= globalThis.localStorage;
-    storage.setItem(STORAGE_KEY, serializeProject(project));
+    storage.setItem(key, serializeProject(project));
     return "complete";
   } catch {
     try {
-      storage.setItem(STORAGE_KEY, serializeProject(project, false));
+      storage.setItem(key, serializeProject(project, false));
       return "parameters";
     } catch {
       return "unavailable";

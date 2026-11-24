@@ -208,7 +208,7 @@ export class Interface {
     if (!this.activePanel) return;
     const [kicker, title] = labels[this.activePanel];
     document.getElementById("panel-kicker").textContent = kicker;
-    document.getElementById("panel-title").textContent = title;
+    document.getElementById("panel-title").textContent = this.activePanel === "lights" && this.state.pictorial?.enabled ? "Estudio pictórico" : title;
     this.body.innerHTML = this[this.activePanel]();
     this.body.scrollTop = 0;
     this.actions.panelChanged?.(this.activePanel);
@@ -222,7 +222,7 @@ export class Interface {
         ? "8,20 × 6,50 × 5,60 m · Sala de referencia"
         : `${this.state.models.length} modelos en la composición`;
     document.getElementById("projection-label").textContent =
-      c.projection === "perspective" ? "Perspectiva" : "Ortogonal";
+      (c.projection === "perspective" ? "Perspectiva" : "Ortogonal") + (this.state.pictorial?.enabled ? " · Pictórico" : "");
     const lock = document.getElementById("camera-lock");
     lock.innerHTML = icon(c.locked ? "lock" : "unlock");
     lock.classList.toggle("active", c.locked);
@@ -396,7 +396,7 @@ export class Interface {
     const output = [...this.body.querySelectorAll("[data-output]")].find(
       (o) => o.dataset.output === path,
     );
-    if (output) output.textContent = `${value}${output.dataset.suffix}`;
+    if (output) output.textContent = `${Math.round(value * Number(output.dataset.scale || 1) * 100) / 100}${output.dataset.suffix}`;
     if (path.startsWith("lights.")) this.syncLightLabels();
     this.update();
   }
@@ -489,7 +489,8 @@ export class Interface {
       )}</div>${c.projection === "perspective" ? this.range("camera.fov", "Campo de visión", 10, 120, 1, "°") : this.range("camera.zoom", "Zoom ortogonal", 0.1, 10, 0.1, "×")}<button class="button full" data-action="fit">${icon("fit")}Encuadrar todos los objetos</button><button class="button full" data-action="initial-camera">${icon("reset")}Volver a la sala</button><details class="advanced"><summary>Posición y punto de interés</summary>${this.triple("camera.position", "Posición (m)")}${this.triple("camera.target", "Mirar hacia (m)")}</details></fieldset><p class="hint">Frente mira desde +Z: X crece hacia la derecha. Las vistas ortogonales permiten medir sin convergencia.</p>`;
   }
   lights() {
-    return `<p class="hint">Primero ubicá el origen; después elegí el destino. La línea señala la dirección; los muros pueden bloquear la luz.</p>${this.state.lights
+    if (this.state.pictorial?.enabled) return this.pictorialPanel();
+    return this.lightingModes() + `<p class="hint">Primero ubicá el origen; después elegí el destino. La línea señala la dirección; los muros pueden bloquear la luz.</p>${this.state.lights
       .map(
         (
           light,
@@ -533,6 +534,34 @@ export class Interface {
         "",
       )}<div class="section">${this.range("appearance.ambient", "Luz ambiente", 0, 1, 0.01)}${this.range("appearance.exposure", "Exposición", 0.1, 4, 0.05)}${this.toggle("appearance.helpers", "Mostrar guías de luces y ejes")}</div><button class="button full" data-action="reset-lights">${icon("reset")}Restablecer iluminación</button><p class="hint">La luz ambiente aclara las sombras sin rebotes físicos. Para estudiar contrastes profundos, reducí su intensidad.</p>`;
   }
+  lightingModes() {
+    const active=!!this.state.pictorial?.enabled;
+    return '<div class="segmented" aria-label="Modo de iluminación"><button data-action="pictorial-mode" data-value="false" class="'+(!active?'active':'')+'">Focos</button><button data-action="pictorial-mode" data-value="true" class="'+(active?'active':'')+'">Pictórico</button></div>';
+  }
+  pictRange(path,label,min=0,max=1,step=.01,suffix='%',scale=100) {
+    const value=get(this.state,path),shown=Math.round(value*scale*100)/100;
+    return '<label class="field"><span class="field-label">'+label+'<output data-output="'+path+'" data-scale="'+scale+'" data-suffix="'+suffix+'">'+shown+suffix+'</output></span><input aria-label="'+label+'" data-path="'+path+'" type="range" min="'+min+'" max="'+max+'" step="'+step+'" value="'+value+'"></label>';
+  }
+  pictorialPanel() {
+    const p=this.state.pictorial;
+    let html=this.lightingModes();
+    html+='<p class="hint">Componé una mancha de valor sobre el volumen. La pared izquierda y el piso se regulan por separado.</p>';
+    html+='<div class="button-row"><button class="button" data-action="pictorial-preset">Fondo y escalera</button><button class="button" data-action="pictorial-view">Vista frontal</button></div>';
+    html+='<section class="section"><h3 class="section-title">Mancha principal</h3><button class="button primary full" data-action="pictorial-pick">'+icon('target')+'Mover mancha en la escena</button>';
+    html+=this.pictRange('pictorial.strength','Fuerza de la mancha');
+    html+=this.pictRange('pictorial.radius.0','Ancho',.3,12,.1,' m',2);
+    html+=this.pictRange('pictorial.radius.1','Alto',.3,6,.1,' m',2);
+    html+=this.pictRange('pictorial.rotation','Inclinación',-180,180,1,'°',1);
+    html+=this.pictRange('pictorial.softness','Suavidad del borde',.01,1,.01);
+    html+='<details class="advanced"><summary>Centro y profundidad</summary>'+this.triple('pictorial.center','Centro de la mancha (m)')+this.pictRange('pictorial.radius.2','Profundidad',.3,10,.1,' m',2)+'</details></section>';
+    html+='<section class="section"><h3 class="section-title">Valores por zona</h3>';
+    for(const [key,label] of [['back','Fondo'],['stairs','Escalera'],['left','Pared izquierda'],['floor','Piso'],['other','Otras superficies']]){
+      html+='<div class="pictorial-zone">'+this.pictRange('pictorial.zones.'+key,label)+this.toggle('pictorial.receives.'+key,'Recibe mancha · '+label)+'</div>';
+    }
+    html+='</section><section class="section"><h3 class="section-title">Claroscuro y forma</h3>'+this.pictRange('pictorial.shadow','Valor general de las sombras')+this.pictRange('pictorial.form','Modelado del volumen')+'</section>';
+    html+='<p class="hint">En 0%, el modelado mantiene los valores planos. Al subirlo aparece una gradación suave según la orientación de las formas. Los focos quedan disponibles en el otro modo.</p>';
+    return html;
+  }
   frame() {
     return `<div class="section"><h3 class="section-title">Proporción de la imagen</h3><div class="ratio-buttons">${Object.entries(
       RATIOS,
@@ -557,7 +586,7 @@ export class Interface {
       )}</select></label><label class="color-row">Fondo<input type="color" aria-label="Color del fondo" data-path="appearance.background" value="${this.state.appearance.background}"></label><label class="field"><span class="field-label">Calidad</span><select data-path="appearance.quality" aria-label="Calidad de renderizado"><option value="balanced" ${this.state.appearance.quality === "balanced" ? "selected" : ""}>Equilibrada · móvil</option><option value="high" ${this.state.appearance.quality === "high" ? "selected" : ""}>Alta · sombras 2048</option></select></label></div><button class="button primary full" data-action="png">${icon("image")}Exportar imagen PNG</button><p class="hint">Imagen del encuadre a la resolución actual, sin controles ni guías.</p>`;
   }
   project() {
-    return `<div class="section"><label class="field"><span class="field-label">Nombre de la composición</span><input type="text" aria-label="Nombre de la composición" data-path="title" value="${esc(this.state.title)}" maxlength="100"></label><div class="measure"><span>Guardado</span><strong>En este navegador</strong></div><p class="hint">Los parámetros se guardan automáticamente. Los modelos también, cuando hay espacio. Conservá una copia JSON para trasladar o recuperar el trabajo.</p></div><div class="section"><h3 class="section-title">Composición portable</h3><button class="button primary full" data-action="export">${icon("export")}Exportar JSON con modelos</button><button class="button full" data-action="import-project">${icon("import")}Abrir composición JSON</button><p class="hint">El JSON incluye cámara, encuadre, luces, visibilidad y los OBJ / GLB importados. Abrir un proyecto reemplaza la composición actual.</p></div><div class="section"><button class="button full" data-action="save">${icon("folder")}Guardar ahora</button><button class="button danger full" data-action="reset">${icon("reset")}Restablecer escena de prueba</button></div><div class="measure"><span>Atelier 3D</span><strong>v0.3</strong></div><p class="hint">Todo el procesamiento ocurre en tu dispositivo. Los archivos importados no se envían a ningún servidor.</p>`;
+    return `<div class="section"><label class="field"><span class="field-label">Nombre de la composición</span><input type="text" aria-label="Nombre de la composición" data-path="title" value="${esc(this.state.title)}" maxlength="100"></label><div class="measure"><span>Guardado</span><strong>En este navegador</strong></div><p class="hint">Los parámetros se guardan automáticamente. Los modelos también, cuando hay espacio. Conservá una copia JSON para trasladar o recuperar el trabajo.</p></div><div class="section"><h3 class="section-title">Composición portable</h3><button class="button primary full" data-action="export">${icon("export")}Exportar JSON con modelos</button><button class="button full" data-action="import-project">${icon("import")}Abrir composición JSON</button><p class="hint">El JSON incluye cámara, encuadre, luces, visibilidad y los OBJ / GLB importados. Abrir un proyecto reemplaza la composición actual.</p></div><div class="section"><button class="button full" data-action="save">${icon("folder")}Guardar ahora</button><button class="button danger full" data-action="reset">${icon("reset")}Restablecer escena de prueba</button></div><div class="measure"><span>Atelier 3D</span><strong>v0.4</strong></div><p class="hint">Todo el procesamiento ocurre en tu dispositivo. Los archivos importados no se envían a ningún servidor.</p>`;
   }
   notify(message, duration = 6500) {
     clearTimeout(this.toastTimer);

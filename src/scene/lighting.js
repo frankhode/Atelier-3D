@@ -39,12 +39,12 @@ export class Lighting {
   }
   apply() {
     this.ambient.intensity =
-      this.soloIndex === null ? this.state.appearance.ambient : 0;
+      this.soloIndex === null && !this.state.pictorial?.enabled ? this.state.appearance.ambient : 0;
     const mapSize = this.state.appearance.quality === "high" ? 2048 : 1024;
     this.lights.forEach((light, i) => {
       const s = this.state.lights[i];
       light.visible =
-        s.enabled && (this.soloIndex === null || this.soloIndex === i);
+        s.enabled && !this.state.pictorial?.enabled && (this.soloIndex === null || this.soloIndex === i);
       light.intensity = s.intensity;
       light.position.fromArray(s.position);
       light.target.position.fromArray(s.target);

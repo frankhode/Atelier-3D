@@ -2,7 +2,7 @@
 
 Un taller web para preparar composiciones pictóricas figurativas: estudiar el encuadre, la perspectiva, la iluminación y el claroscuro sobre una escena neutra.
 
-Versión **0.3**, con edición explícita del origen y el destino de cada luz. HTML, CSS y JavaScript modular con Three.js. Sitio estático, compatible con GitHub Pages, sin cuentas, backend, bases de datos, tokens de aplicación ni servicios pagos. Las dependencias quedan incluidas en el build; el navegador no carga bibliotecas desde un CDN.
+Versión **0.4**, con una primera prueba de claroscuro pictórico además de los focos. HTML, CSS y JavaScript modular con Three.js. Sitio estático, compatible con GitHub Pages, sin cuentas, backend, bases de datos, tokens de aplicación ni servicios pagos. Las dependencias quedan incluidas en el build; el navegador no carga bibliotecas desde un CDN.
 
 ## Uso
 
@@ -107,3 +107,25 @@ El workflow de CI corre tests y build en cada pull request. El workflow de Pages
 - [Three.js · OrbitControls](https://threejs.org/docs/pages/OrbitControls.html)
 - [Three.js · GLTFLoader](https://threejs.org/docs/pages/GLTFLoader.html)
 - [GitHub Pages · workflows propios](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages)
+
+## Prueba pictórica 0.4
+
+Abrir [el estudio de claroscuro](https://frankhode.github.io/Atelier-3D/?pictorico=1). Este enlace usa un guardado distinto (`atelier3d:pictorial-study:v1`) y una sala de prueba frontal: conserva la composición física del navegador. También está disponible en **Luces → Pictórico** dentro de cualquier composición.
+
+La mancha es un volumen elipsoidal suave en coordenadas de la escena; se puede centrar tocando superficies y ajustar ancho, alto, profundidad, inclinación y borde. No depende de posiciones de focos, distancia inversa al cuadrado ni mapas de sombra. Por defecto participan fondo y escalera; la pared izquierda y el piso conservan valores separados. Los controles “Recibe mancha” permiten decidir qué zonas participan. Los barrotes mantienen un valor oscuro para conservar la lectura de la escalera.
+
+“Valor general de las sombras” desplaza los valores base; “Modelado del volumen” añade una modulación suave por orientación que puede llevarse a cero para trabajar con valores planos. La iluminación pictórica ignora exposición y color del material físico; sus valores son perceptuales y no se recortan con el tone mapping de los focos. Fondo y calidad continúan disponibles en Encuadre. Los parámetros y el modo se guardan y exportan en JSON. Los documentos antiguos se abren en modo Focos.
+
+Esta primera prueba ofrece una mancha y valores por grupos de superficies. No incluye pincel libre, varias capas, sombras pintadas ni edición individual de figuras. Es una herramienta de composición tonal, no una simulación de luz rebotada.
+
+### Verificación gráfica
+
+El workflow de CI instala Playwright únicamente para pruebas, compila la aplicación y ejecuta Chromium con render WebGL por software en el runner. Lee los píxeles de la escena después de renderizar: verifica la jerarquía fondo / izquierda / piso, cambia el valor de la izquierda y comprueba que los otros planos se conservan. Los shaders deben compilar sin errores. Se guardan capturas de escritorio y móvil como artefactos de QA por siete días. Esta verificación reemplaza la limitación anterior de comprobar solamente los parámetros del render. No equivale a una prueba de rendimiento en Android.
+
+Para repetirla tras `npm ci` y `npm run build`:
+
+```sh
+npm install --no-save --package-lock=false playwright@1.56.1
+npx playwright install --with-deps chromium
+npm run test:render
+```

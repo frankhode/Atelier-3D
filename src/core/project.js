@@ -1,3 +1,4 @@
+import { validatePictorial } from "./pictorial.js";
 import {
   APP_FORMAT,
   SCHEMA_VERSION,
@@ -86,6 +87,7 @@ export function validateProject(input) {
       helpers: bool(a.helpers, "guías"),
       quality: a.quality,
     },
+    pictorial: validatePictorial(input.pictorial),
     lights: input.lights.map((l) => {
       if (!l) fail("luz");
       const pos = vector(l.position, "posición de luz"),

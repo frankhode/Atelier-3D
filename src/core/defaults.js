@@ -1,3 +1,4 @@
+import { defaultPictorial } from "./pictorial.js";
 export const APP_FORMAT = "atelier-3d";
 export const SCHEMA_VERSION = 1;
 export const MAX_MODEL_BYTES = 32 * 1024 * 1024;
@@ -35,6 +36,7 @@ export function defaultProject() {
       helpers: false,
       quality: "balanced",
     },
+    pictorial: defaultPictorial(),
     lights: [
       {
         name: "Principal · abertura superior",
