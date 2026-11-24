@@ -11,6 +11,7 @@ import {
   findLightBlocker,
 } from "./scene/light-aimer.js";
 import { aimLight, lightFromView } from "./scene/light-controls.js";
+import { setLightOrigin, presetOrigin } from "./scene/light-origins.js";
 import { angleForDiameter, BEAM_PRESETS } from "./core/light-beam.js";
 import { ModelManager, recordFromFile } from "./scene/models.js";
 import { Interface } from "./ui/interface.js";
@@ -67,24 +68,32 @@ async function boot() {
     },
   });
   function updateTargetMarker() {
-    if (!targetPreview || !ui) return;
-    ui.showLightTarget(
-      targetPreview.index,
-      projectToCanvas(
-        targetPreview.point,
-        rig.camera,
-        viewport.renderer.domElement,
-      ),
+    if (!ui) return;
+    const index =
+      ui.activePanel === "lights" ? ui.selectedLight : targetPreview?.index;
+    if (index === undefined || index === null || !state.lights[index]) {
+      ui.hideLightTarget();
+      return;
+    }
+    const light = state.lights[index],
+      canvas = viewport.renderer.domElement;
+    const target = projectToCanvas(light.target, rig.camera, canvas);
+    ui.showLightTarget(index, target);
+    ui.showLightOrigin(
+      index,
+      projectToCanvas(light.position, rig.camera, canvas),
+      target,
+      canvas.getBoundingClientRect(),
     );
   }
   function hideTargetMarker() {
     clearTimeout(targetTimer);
     targetPreview = null;
-    ui?.hideLightTarget();
+    updateTargetMarker();
   }
   function previewTarget(index, permanent = false) {
     clearTimeout(targetTimer);
-    targetPreview = { index, point: state.lights[index].target.slice() };
+    targetPreview = { index };
     updateTargetMarker();
     if (!permanent) targetTimer = setTimeout(hideTargetMarker, 6500);
   }
@@ -94,7 +103,7 @@ async function boot() {
     if (!light.enabled) ui.notify("Punto actualizado. Esta luz está apagada.");
     else if (blocker)
       ui.notify(
-        `El recorrido hacia ese punto está bloqueado por ${blocker.name.replaceAll("_", " ")}. Probá Luz desde esta vista.`,
+        `El recorrido hacia ese punto está bloqueado por ${blocker.name.replaceAll("_", " ")}. Probá otra posición del origen.`,
         10000,
       );
     else
@@ -134,12 +143,12 @@ async function boot() {
   }
   function apply(path) {
     validateProject(state);
-    if (targetPreview && path.startsWith(`lights.${targetPreview.index}.`))
-      targetPreview.point = state.lights[targetPreview.index].target.slice();
     if (path.startsWith("camera.")) {
       rig.restore();
       if (path === "camera.locked") ui.refresh();
     }
+    if (path.startsWith("lights."))
+      ui.selectedLight = Number(path.split(".")[1]);
     if (path.startsWith("lights.") || path.startsWith("appearance."))
       lighting.apply();
     if (path.startsWith("models."))
@@ -211,6 +220,7 @@ async function boot() {
   const actions = {
     changed,
     apply,
+    panelChanged: () => viewport.requestRender(),
     notify: (message) => ui.notify(message),
     importModel: () => document.getElementById("model-input").click(),
     lock: () => rig.lock(),
@@ -273,6 +283,28 @@ async function boot() {
         viewport.requestRender();
         if (next !== null && !state.lights[next].enabled)
           ui.notify("Esta luz está apagada. Encendela para verla sola.");
+      } else if (name === "light-origin" || name === "origin-preset") {
+        const index = Number(id),
+          light = state.lights[index];
+        if (!Number.isInteger(index) || !light) return;
+        const previous = light.position;
+        try {
+          const point =
+            name === "origin-preset" ? presetOrigin(models, value) : value;
+          setLightOrigin(light, point);
+          validateProject(state);
+        } catch (error) {
+          light.position = previous;
+          ui.notify(error.message);
+          return;
+        }
+        ui.selectedLight = index;
+        lighting.apply();
+        changed();
+        previewTarget(index);
+        ui.syncLightLabels();
+        if (light.enabled && light.shadows && findLightBlocker(light, models))
+          describeLightPath(index);
       } else if (name === "light-from-view") {
         const index = Number(value),
           light = state.lights[index];

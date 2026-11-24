@@ -1,5 +1,7 @@
 import { icon, hydrateIcons } from "./icons.js";
 import { RATIOS } from "../core/defaults.js";
+import { ORIGIN_PRESETS, planPointFromClient } from "../scene/light-origins.js";
+import { lightPlanMarkup, planBoundsFromElement } from "./light-plan.js";
 import { BEAM_PRESETS, beamDiameter } from "../core/light-beam.js";
 const esc = (value) =>
   String(value).replace(
@@ -16,6 +18,12 @@ const set = (object, path, value) => {
     key = parts.pop();
   (parts.length ? get(object, parts.join(".")) : object)[key] = value;
 };
+const lightName = (light) =>
+  ({
+    "Principal · abertura superior": "Principal",
+    "Relleno · puerta ventana": "Relleno",
+    "Residual · aberturas derechas": "Residual",
+  })[light.name] || light.name;
 const labels = {
   objects: ["ESCENA", "Objetos"],
   camera: ["PUNTO DE VISTA", "Cámara"],
@@ -90,11 +98,82 @@ export class Interface {
         this.handleInput(e);
     });
     this.body.addEventListener("click", (e) => this.handleAction(e));
+    this.body.addEventListener("pointerdown", (event) => {
+      if (this.planGesture) {
+        this.planGesture.moved = true;
+        return;
+      }
+      const plan = event.target.closest("[data-light-plan]");
+      if (plan && event.button === 0)
+        this.planGesture = {
+          plan,
+          id: event.pointerId,
+          x: event.clientX,
+          y: event.clientY,
+          moved: false,
+        };
+    });
+    document.addEventListener("pointermove", (event) => {
+      if (
+        this.planGesture?.id === event.pointerId &&
+        Math.hypot(
+          event.clientX - this.planGesture.x,
+          event.clientY - this.planGesture.y,
+        ) > 8
+      )
+        this.planGesture.moved = true;
+    });
+    document.addEventListener("pointercancel", () => {
+      this.planGesture = null;
+    });
+    document.addEventListener("pointerup", (event) => {
+      const gesture = this.planGesture;
+      this.planGesture = null;
+      if (
+        !gesture ||
+        gesture.id !== event.pointerId ||
+        gesture.moved ||
+        Math.hypot(event.clientX - gesture.x, event.clientY - gesture.y) > 8
+      )
+        return;
+      const svg = gesture.plan.querySelector("svg");
+      const point = planPointFromClient(
+        event.clientX,
+        event.clientY,
+        svg.getBoundingClientRect(),
+        planBoundsFromElement(svg),
+      );
+      if (point) {
+        const index = Number(gesture.plan.dataset.lightPlan);
+        this.actions.action(
+          "light-origin",
+          [point[0], this.state.lights[index].position[1], point[1]],
+          String(index),
+        );
+      }
+    });
+    this.body.addEventListener("keydown", (event) => {
+      const plan = event.target.closest("[data-light-plan]");
+      if (
+        !plan ||
+        !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)
+      )
+        return;
+      event.preventDefault();
+      const index = Number(plan.dataset.lightPlan),
+        point = this.state.lights[index].position.slice(),
+        step = event.shiftKey ? 1 : 0.25;
+      point[event.key === "ArrowLeft" || event.key === "ArrowRight" ? 0 : 2] +=
+        (event.key === "ArrowLeft" || event.key === "ArrowUp" ? -1 : 1) * step;
+      this.actions.action("light-origin", point, String(index));
+    });
     this.body.addEventListener(
       "toggle",
       (event) => {
-        if (event.target.matches(".light-card[open]"))
+        if (event.target.matches(".light-card[open]")) {
           this.selectedLight = Number(event.target.dataset.light);
+          this.actions.panelChanged?.("lights");
+        }
       },
       true,
     );
@@ -123,6 +202,7 @@ export class Interface {
         ),
       );
     if (name) this.refresh();
+    this.actions.panelChanged?.(name);
   }
   refresh() {
     if (!this.activePanel) return;
@@ -131,6 +211,7 @@ export class Interface {
     document.getElementById("panel-title").textContent = title;
     this.body.innerHTML = this[this.activePanel]();
     this.body.scrollTop = 0;
+    this.actions.panelChanged?.(this.activePanel);
   }
   update() {
     const c = this.state.camera;
@@ -191,7 +272,7 @@ export class Interface {
     if (active) {
       this.open(null);
       document.getElementById("light-aim-name").textContent =
-        `Luz ${index + 1} · ${this.state.lights[index].name}${this.state.lights[index].enabled ? "" : " (apagada)"}`;
+        `Luz ${index + 1} · ${lightName(this.state.lights[index])}${this.state.lights[index].enabled ? "" : " (apagada)"}`;
       document.getElementById("cancel-light-aim").focus();
     }
   }
@@ -201,13 +282,66 @@ export class Interface {
     marker.style.left = `${screen.x}px`;
     marker.style.top = `${screen.y}px`;
     marker.querySelector(".target-label").textContent =
-      `Punto de luz ${index + 1}`;
+      `Destino · luz ${index + 1}`;
+  }
+  showLightOrigin(index, source, destination, rect) {
+    const marker = document.getElementById("light-origin-marker"),
+      status = document.getElementById("light-origin-status"),
+      path = document.getElementById("light-path-overlay");
+    marker.hidden = !source.visible;
+    if (source.visible) {
+      marker.style.left = `${source.x}px`;
+      marker.style.top = `${source.y}px`;
+      marker.querySelector(".target-label").textContent =
+        `Origen · luz ${index + 1}`;
+    }
+    status.hidden = source.visible;
+    if (!source.visible)
+      status.textContent = source.atCamera
+        ? `Origen de luz ${index + 1}: en la cámara`
+        : `Origen de luz ${index + 1}: fuera del encuadre`;
+    const drawable =
+      source.inFront &&
+      destination.inFront &&
+      [source.x, source.y, destination.x, destination.y].every(Number.isFinite);
+    path.toggleAttribute("hidden", !drawable);
+    if (drawable) {
+      path.style.left = `${rect.left}px`;
+      path.style.top = `${rect.top}px`;
+      path.style.width = `${rect.width}px`;
+      path.style.height = `${rect.height}px`;
+      path.setAttribute("viewBox", `0 0 ${rect.width} ${rect.height}`);
+      const line = path.querySelector("line");
+      for (const [name, value] of Object.entries({
+        x1: source.x - rect.left,
+        y1: source.y - rect.top,
+        x2: destination.x - rect.left,
+        y2: destination.y - rect.top,
+      }))
+        line.setAttribute(name, value);
+    }
   }
   hideLightTarget() {
-    document.getElementById("light-target-marker").hidden = true;
+    for (const id of [
+      "light-target-marker",
+      "light-origin-marker",
+      "light-origin-status",
+      "light-path-overlay",
+    ])
+      document.getElementById(id).toggleAttribute("hidden", true);
   }
   handleInput(event) {
     const el = event.target;
+    const lightCard = el.closest(".light-card");
+    if (lightCard && this.selectedLight !== Number(lightCard.dataset.light)) {
+      this.selectedLight = Number(lightCard.dataset.light);
+      this.actions.panelChanged?.("lights");
+    }
+    if (el.dataset.originPreset !== undefined) {
+      if (event.type === "change" && el.value)
+        this.actions.action("origin-preset", el.value, el.dataset.originPreset);
+      return;
+    }
     if (el.dataset.concentrate !== undefined) {
       this.concentrateOnAim[Number(el.dataset.concentrate)] = el.checked;
       return;
@@ -267,6 +401,18 @@ export class Interface {
     this.update();
   }
   syncLightLabels() {
+    this.body.querySelectorAll("[data-light-plan]").forEach((plan) => {
+      const index = Number(plan.dataset.lightPlan);
+      plan.innerHTML = lightPlanMarkup(
+        this.models,
+        this.state.lights[index],
+        index,
+      );
+    });
+    this.body.querySelectorAll("[data-source-coordinate]").forEach((input) => {
+      if (input !== document.activeElement)
+        input.value = Number(get(this.state, input.dataset.path).toFixed(3));
+    });
     this.body.querySelectorAll("[data-target-summary]").forEach((el) => {
       el.textContent = this.targetSummary(
         this.state.lights[Number(el.dataset.targetSummary)],
@@ -305,6 +451,8 @@ export class Interface {
   handleAction(event) {
     const button = event.target.closest("button[data-action]");
     if (!button) return;
+    const card = button.closest(".light-card");
+    if (card) this.selectedLight = Number(card.dataset.light);
     this.actions.action(
       button.dataset.action,
       button.dataset.value,
@@ -341,29 +489,34 @@ export class Interface {
       )}</div>${c.projection === "perspective" ? this.range("camera.fov", "Campo de visión", 10, 120, 1, "°") : this.range("camera.zoom", "Zoom ortogonal", 0.1, 10, 0.1, "×")}<button class="button full" data-action="fit">${icon("fit")}Encuadrar todos los objetos</button><button class="button full" data-action="initial-camera">${icon("reset")}Volver a la sala</button><details class="advanced"><summary>Posición y punto de interés</summary>${this.triple("camera.position", "Posición (m)")}${this.triple("camera.target", "Mirar hacia (m)")}</details></fieldset><p class="hint">Frente mira desde +Z: X crece hacia la derecha. Las vistas ortogonales permiten medir sin convergencia.</p>`;
   }
   lights() {
-    return `<p class="hint">Elegí dónde iluminar y ajustá el ancho del haz por separado.</p>${this.state.lights
+    return `<p class="hint">Primero ubicá el origen; después elegí el destino. La línea señala la dirección; los muros pueden bloquear la luz.</p>${this.state.lights
       .map(
         (
           light,
           i,
         ) => `<details class="light-card" data-light="${i}" ${i === this.selectedLight ? "open" : ""}>
-      <summary><span class="light-number">${i + 1}</span><span>${esc(light.name)}</span></summary>
+      <summary><span class="light-number">${i + 1}</span><span>${esc(lightName(light))}</span></summary>
       <div class="light-content">
         ${this.toggle(`lights.${i}.enabled`, "Luz encendida")}
         <button class="button full ${this.soloLight === i ? "active" : ""}" data-action="solo-light" data-value="${i}" aria-pressed="${this.soloLight === i}">${icon("eye")}${this.soloLight === i ? "Mostrar todas las luces" : "Ver solo esta luz"}</button>
         ${this.soloLight === i ? '<p class="hint">Vista temporal: solo esta luz, sin ambiente. Podés salir con el botón superior.</p>' : ""}
+        <div class="light-origin-controls">
+          <h3 class="section-title">Origen · desde dónde sale</h3>
+          <div class="source-coordinates triple">${["X · lateral", "Y · altura", "Z · fondo"].map((label, axis) => `<label>${label}<input type="number" data-source-coordinate data-path="lights.${i}.position.${axis}" aria-label="Origen de luz ${i + 1} ${["X", "Y", "Z"][axis]} en metros" step="any" min="-100000" max="100000" value="${Number(light.position[axis].toFixed(3))}"></label>`).join("")}</div>
+          <div class="light-plan" data-light-plan="${i}" tabindex="0" role="group" aria-label="Plano de origen de luz ${i + 1}. Tocá para mover X y Z; las teclas de dirección también lo mueven.">${lightPlanMarkup(this.models, light, i)}</div>
+          <div class="plan-legend"><span><i class="legend-origin"></i>Origen</span><span><i class="legend-destination"></i>Destino</span><span>Vista superior · metros</span></div>
+          <p class="hint">Tocá el plano para ubicar el origen. Y determina la altura. Fondo arriba, frente abajo.</p>
+          <label class="field"><span class="field-label">Ubicación rápida</span><select data-origin-preset="${i}" aria-label="Ubicación rápida de luz ${i + 1}" ${this.models.entries.has("sala-v04") ? "" : "disabled"}><option value="">Elegir ubicación de la sala…</option>${ORIGIN_PRESETS.map((p) => `<option value="${p.id}">${p.label}</option>`).join("")}</select></label>
+          <button class="button full" data-action="light-from-view" data-value="${i}">${icon("camera")}Luz desde esta vista</button>
+          <button class="button full" data-action="show-light-target" data-value="${i}">${icon("eye")}Ver origen y destino</button>
+        </div>
         <div class="light-target-controls">
-          <h3 class="section-title">Hacia dónde ilumina</h3>
+          <h3 class="section-title">Destino · hacia dónde apunta</h3>
           <label class="toggle-row"><span>Concentrar al apuntar</span><input type="checkbox" data-concentrate="${i}" aria-label="Concentrar luz ${i + 1} al apuntar" ${this.concentrateOnAim[i] ? "checked" : ""}></label>
           <button class="button primary full" data-action="aim-light" data-value="${i}">${icon("target")}Apuntar en la escena</button>
           <p class="hint">Tocá una superficie. Con Concentrar, el haz se reduce a un máximo aproximado de 1,50 m para distinguir el destino; después podés ampliarlo.</p>
           <div class="target-summary"><span data-target-summary="${i}">${esc(this.targetSummary(light))}</span><button class="button" data-action="show-light-target" data-value="${i}" aria-label="Ver punto de luz ${i + 1}">${icon("eye")}Ver punto</button></div>
           <details class="advanced"><summary>Ajuste preciso del punto</summary>${this.triple(`lights.${i}.target`, "Punto iluminado (m)")}</details>
-        </div>
-        <div class="light-origin-controls">
-          <h3 class="section-title">Desde dónde llega</h3>
-          <button class="button full" data-action="light-from-view" data-value="${i}">${icon("camera")}Luz desde esta vista</button>
-          <p class="hint">Mueve el origen a la cámara. Cambia el recorrido de la luz y de las sombras.</p>
         </div>
         ${this.range(`lights.${i}.intensity`, "Intensidad", 0, 500, 1, " cd")}
         <h3 class="section-title">Ancho del haz</h3>
@@ -372,7 +525,7 @@ export class Interface {
         <p class="hint">Ancho aproximado. En una superficie oblicua, la mancha se alarga.</p>
         ${this.range(`lights.${i}.penumbra`, "Borde suave", 0, 1, 0.05)}
         ${this.toggle(`lights.${i}.shadows`, "Proyectar sombras")}
-        <details class="advanced"><summary>Origen de la luz y ángulo preciso</summary>${this.triple(`lights.${i}.position`, "Origen (m)")}<label class="field"><span class="field-label">Semiángulo del haz (°)</span><input type="number" aria-label="Semiángulo de luz ${i + 1}" data-path="lights.${i}.angle" value="${light.angle}" min="0.5" max="85" step="any"></label></details>
+        <details class="advanced"><summary>Ángulo preciso</summary><label class="field"><span class="field-label">Semiángulo del haz (°)</span><input type="number" aria-label="Semiángulo de luz ${i + 1}" data-path="lights.${i}.angle" value="${light.angle}" min="0.5" max="85" step="any"></label></details>
       </div>
     </details>`,
       )
@@ -404,7 +557,7 @@ export class Interface {
       )}</select></label><label class="color-row">Fondo<input type="color" aria-label="Color del fondo" data-path="appearance.background" value="${this.state.appearance.background}"></label><label class="field"><span class="field-label">Calidad</span><select data-path="appearance.quality" aria-label="Calidad de renderizado"><option value="balanced" ${this.state.appearance.quality === "balanced" ? "selected" : ""}>Equilibrada · móvil</option><option value="high" ${this.state.appearance.quality === "high" ? "selected" : ""}>Alta · sombras 2048</option></select></label></div><button class="button primary full" data-action="png">${icon("image")}Exportar imagen PNG</button><p class="hint">Imagen del encuadre a la resolución actual, sin controles ni guías.</p>`;
   }
   project() {
-    return `<div class="section"><label class="field"><span class="field-label">Nombre de la composición</span><input type="text" aria-label="Nombre de la composición" data-path="title" value="${esc(this.state.title)}" maxlength="100"></label><div class="measure"><span>Guardado</span><strong>En este navegador</strong></div><p class="hint">Los parámetros se guardan automáticamente. Los modelos también, cuando hay espacio. Conservá una copia JSON para trasladar o recuperar el trabajo.</p></div><div class="section"><h3 class="section-title">Composición portable</h3><button class="button primary full" data-action="export">${icon("export")}Exportar JSON con modelos</button><button class="button full" data-action="import-project">${icon("import")}Abrir composición JSON</button><p class="hint">El JSON incluye cámara, encuadre, luces, visibilidad y los OBJ / GLB importados. Abrir un proyecto reemplaza la composición actual.</p></div><div class="section"><button class="button full" data-action="save">${icon("folder")}Guardar ahora</button><button class="button danger full" data-action="reset">${icon("reset")}Restablecer escena de prueba</button></div><div class="measure"><span>Atelier 3D</span><strong>v0.2.1</strong></div><p class="hint">Todo el procesamiento ocurre en tu dispositivo. Los archivos importados no se envían a ningún servidor.</p>`;
+    return `<div class="section"><label class="field"><span class="field-label">Nombre de la composición</span><input type="text" aria-label="Nombre de la composición" data-path="title" value="${esc(this.state.title)}" maxlength="100"></label><div class="measure"><span>Guardado</span><strong>En este navegador</strong></div><p class="hint">Los parámetros se guardan automáticamente. Los modelos también, cuando hay espacio. Conservá una copia JSON para trasladar o recuperar el trabajo.</p></div><div class="section"><h3 class="section-title">Composición portable</h3><button class="button primary full" data-action="export">${icon("export")}Exportar JSON con modelos</button><button class="button full" data-action="import-project">${icon("import")}Abrir composición JSON</button><p class="hint">El JSON incluye cámara, encuadre, luces, visibilidad y los OBJ / GLB importados. Abrir un proyecto reemplaza la composición actual.</p></div><div class="section"><button class="button full" data-action="save">${icon("folder")}Guardar ahora</button><button class="button danger full" data-action="reset">${icon("reset")}Restablecer escena de prueba</button></div><div class="measure"><span>Atelier 3D</span><strong>v0.3</strong></div><p class="hint">Todo el procesamiento ocurre en tu dispositivo. Los archivos importados no se envían a ningún servidor.</p>`;
   }
   notify(message, duration = 6500) {
     clearTimeout(this.toastTimer);

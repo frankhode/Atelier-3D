@@ -81,10 +81,17 @@ export function projectToCanvas(point, camera, canvas) {
   camera.updateMatrixWorld(true);
   const ndc = new THREE.Vector3(...point).project(camera);
   const rect = canvas.getBoundingClientRect();
+  const view = new THREE.Vector3(...point).applyMatrix4(
+    camera.matrixWorldInverse,
+  );
+  const inFront = view.z < -camera.near;
   return {
+    inFront,
+    atCamera: view.length() < 0.001,
     x: rect.left + ((ndc.x + 1) * rect.width) / 2,
     y: rect.top + ((1 - ndc.y) * rect.height) / 2,
     visible:
+      inFront &&
       Number.isFinite(ndc.x) &&
       Number.isFinite(ndc.y) &&
       Math.abs(ndc.x) <= 1 &&

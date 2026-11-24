@@ -127,6 +127,26 @@
         </div>
         <button id="cancel-light-aim" class="button">Cancelar</button>
       </div>
+      <svg id="light-path-overlay" aria-hidden="true" hidden>
+        <defs>
+          <marker
+            id="scene-light-arrow"
+            viewBox="0 0 6 6"
+            refX="5"
+            refY="3"
+            markerWidth="6"
+            markerHeight="6"
+            orient="auto"
+          >
+            <path d="M0 0 6 3 0 6Z" fill="#e3c78e" />
+          </marker>
+        </defs>
+        <line marker-end="url(#scene-light-arrow)" />
+      </svg>
+      <div id="light-origin-marker" hidden aria-hidden="true">
+        <span class="origin-dot"></span><span class="target-label"></span>
+      </div>
+      <div id="light-origin-status" hidden></div>
       <div id="light-target-marker" hidden aria-hidden="true">
         <span class="target-cross"></span><span class="target-label"></span>
       </div>
@@ -180,7 +200,7 @@
             </dd>
           </dl>
           <p class="muted">
-            Versión 0.2.1 · Sin cuentas ni servicios externos. OBJ sin MTL; GLB
+            Versión 0.3 · Sin cuentas ni servicios externos. OBJ sin MTL; GLB
             autocontenido sin compresión Draco, Meshopt ni KTX2. No se
             reproducen animaciones.
           </p>

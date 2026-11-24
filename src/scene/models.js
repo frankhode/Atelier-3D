@@ -182,13 +182,13 @@ export class ModelManager {
   clear() {
     [...this.entries.keys()].forEach((id) => this.remove(id));
   }
-  bounds(id) {
+  bounds(id, precise = true) {
     const bounds = new THREE.Box3();
     for (const [key, entry] of this.entries) {
       if ((id && key !== id) || !entry.wrapper.visible) continue;
       entry.wrapper.updateMatrixWorld(true);
       entry.objects.forEach((o) => {
-        if (o.mesh.visible) bounds.expandByObject(o.mesh, true);
+        if (o.mesh.visible) bounds.expandByObject(o.mesh, precise);
       });
     }
     return bounds;

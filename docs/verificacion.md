@@ -58,3 +58,9 @@ Se prueba el recorrido completo de geometría y parámetros con varios puntos re
 También se verifica Solo temporal sin mutaciones en el JSON, restauración del ambiente y de fuentes desactivadas, colocación del origen desde la cámara, conservación del ancho, detección de obstáculos reales, exclusión de obstáculos ocultos y opción visible para conservar el ancho al apuntar.
 
 Aceptación en Android: elegir la luz principal, activar Ver solo esta luz, mantener Concentrar al apuntar y tocar dos zonas distintas de la pared. Comprobar desplazamiento de la mancha. Pulsar Luz desde esta vista para cambiar la incidencia y la dirección de las sombras. Salir de Solo con el botón superior. No borrar datos del navegador para actualizar: basta recargar la página.
+
+## Actualización 0.3: origen explícito
+
+Se agregan pruebas de origen independiente de destino/ángulo/cámara, persistencia JSON de posición, rechazo atómico de un origen coincidente con destino, presets en coordenadas transformadas, huellas de los pisos del OBJ, mapeo de taps con bandas SVG horizontales/verticales, coordenadas visibles antes del destino, foco conservado al editar altura, colocación por un tap y descarte de arrastre, movimiento por teclado, salida visual de origen fuera de encuadre y guías DOM/SVG que se ocultan completamente. Se mantiene la limitación de inspección WebGL del entorno de QA.
+
+Aceptación: abrir Luces y seleccionar Frente de la sala como origen; verificar X=4,10, Y=3,20 y Z=6,20 en la sala sin transformaciones. Tocar otro punto del plano: cambian X/Z y se conserva Y y el destino. Cambiar Y para subir la fuente. Elegir luego un destino en la pared del fondo. Confirmar que las sombras corresponden al origen elegido. Repetir con cámara bloqueada y reabrir JSON.

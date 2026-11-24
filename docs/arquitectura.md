@@ -1,4 +1,4 @@
-# Arquitectura · Atelier 3D 0.2.1
+# Arquitectura · Atelier 3D 0.3
 
 ## Responsabilidades
 
@@ -11,6 +11,8 @@
 | `src/scene/camera-rig.js` | Dos cámaras, navegación, vistas ortogonales, conservación de escala al cambiar de proyección, encuadre y bloqueo. |
 | `src/core/light-beam.js` | Conversión entre semiángulo y diámetro a la distancia del destino; presets del haz. |
 | `src/scene/light-aimer.js` | Selección por rayo sobre superficies visibles; tap frente a arrastre/multitoque, bloqueo temporal de navegación y proyección del marcador. |
+| `src/scene/light-origins.js` | Posición independiente del origen, presets transformados con la sala, planta simplificada y mapeo de toques con bandas SVG. |
+| `src/ui/light-plan.js` | Representación SVG del plano de origen/destino. |
 | `src/scene/light-controls.js` | Aplicación del destino con concentración según la normal de la superficie; posición de origen desde la cámara conservando el ancho. |
 | `src/scene/lighting.js` | Tres focos, sombras, ambiente y guías. |
 | `src/scene/models.js` | Importación OBJ/GLB, material neutro, piezas, transformaciones, descarte de recursos y preparación transaccional de un proyecto. |
@@ -63,3 +65,11 @@ La selección devuelve también la normal de la superficie en coordenadas mundia
 El modo Solo es una propiedad temporal del módulo de iluminación. Oculta otras luces y ambiente al renderizar, sin tocar los booleanos guardados del documento. Tiene una salida visible fuera del panel. Cargar otra composición o restablecer luces sale del modo.
 
 Mover origen desde la cámara conserva destino y ancho perpendicular aproximado y actualiza el estado persistido. El diagnóstico del recorrido usa un rayo entre fuente y destino contra mallas visibles; excluye el último tramo para no informar la superficie receptora como un obstáculo. Solo se informa obstrucción cuando esa fuente proyecta sombras.
+
+## Origen explícito y plano (0.3)
+
+Los campos `lights[i].position` pasan a primer plano, antes del destino. El plano interactivo trabaja en X/Z y conserva Y; no depende de la cámara ni de una intersección con superficies, por lo que permite colocar luces en el espacio libre y fuera de la sala. El mapeo compensa las bandas de `preserveAspectRatio=xMidYMid meet`. Solo un tap sin arrastre aplica un punto; el teclado ofrece ajustes incrementales.
+
+El plano incluye el origen, destino y límites de referencia, con las huellas de los pisos del OBJ transformadas a mundo. Usa cajas rápidas para evitar recorrer todos los vértices durante cambios de luz. Los presets convierten sus coordenadas locales a mundo con la transformación de la sala.
+
+El origen y destino en pantalla son DOM y una línea SVG recortada al rectángulo del canvas. Una posición detrás de la cámara no se proyecta como si estuviera delante; el origen fuera de cuadro y el origen en cámara se comunican explícitamente. Las guías se actualizan al navegar o editar y no participan del render exportado. Se conserva el esquema JSON v1 sin migración.

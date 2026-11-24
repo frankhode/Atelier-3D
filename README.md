@@ -2,7 +2,7 @@
 
 Un taller web para preparar composiciones pictóricas figurativas: estudiar el encuadre, la perspectiva, la iluminación y el claroscuro sobre una escena neutra.
 
-Versión **0.2.1**, con selección del destino de cada luz directamente en la escena. HTML, CSS y JavaScript modular con Three.js. Sitio estático, compatible con GitHub Pages, sin cuentas, backend, bases de datos, tokens de aplicación ni servicios pagos. Las dependencias quedan incluidas en el build; el navegador no carga bibliotecas desde un CDN.
+Versión **0.3**, con edición explícita del origen y el destino de cada luz. HTML, CSS y JavaScript modular con Three.js. Sitio estático, compatible con GitHub Pages, sin cuentas, backend, bases de datos, tokens de aplicación ni servicios pagos. Las dependencias quedan incluidas en el build; el navegador no carga bibliotecas desde un CDN.
 
 ## Uso
 
@@ -30,9 +30,24 @@ Los datos pertenecen a ese navegador y al origen del sitio. No se sincronizan en
 - Límite de **32 MB por modelo**, **96 MB por proyecto JSON** y **100 modelos por composición**. El rendimiento depende de polígonos, texturas originales y memoria del dispositivo; estas cifras son límites de entrada, no una garantía de fluidez.
 - La unidad de trabajo es el metro. Los botones m / cm / mm establecen la conversión de escala. “Z arriba” rota −90° sobre X; no cambia la lateralidad.
 
+## Ubicar el origen antes de apuntar
+
+Cada luz tiene dos puntos independientes:
+
+- **Origen · desde dónde sale:** coordenadas X (lateral), Y (altura) y Z (profundidad), visibles al principio de su panel.
+- **Destino · hacia dónde apunta:** el punto elegido sobre una superficie de la escena.
+
+El **plano visto desde arriba** muestra el origen en dorado, el destino como una cruz y la dirección entre ambos. Tocar el plano mueve X y Z del origen; la altura Y se mantiene y se cambia en su campo. Arrastrar para desplazar el panel no coloca la luz por accidente. También se puede enfocar el plano con Tab y moverlo con las teclas de dirección (0,25 m; Shift = 1 m).
+
+**Ubicación rápida** ofrece Frente de la sala, Abertura superior derecha, Puerta ventana izquierda y Aberturas inferiores derechas. Los presets respetan el desplazamiento, rotación y escala de la sala de referencia. Cambian el origen, conservando destino y ángulo. Los nombres Principal / Relleno / Residual identifican las luces; no afirman que sigan en su abertura original después de moverlas.
+
+Con el panel de Luces abierto se muestran en la escena el marcador del origen, el del destino y una línea de dirección. **Ver origen y destino** despeja el panel y los muestra unos segundos. Si el origen está fuera del encuadre, o coincide con la cámara, se informa en vez de dibujar un marcador en una posición falsa. Son guías de interfaz y no aparecen en el PNG. No representan luz atravesando obstáculos.
+
+El movimiento desde el plano y los campos funciona con la cámara bloqueada. La posición se guarda en los mismos parámetros y JSON anteriores; las composiciones existentes no se reinician.
+
 ## Apuntar las luces
 
-1. Abrir **Luces** y desplegar la luz que quieras dirigir.
+1. Abrir **Luces**, desplegar la luz y determinar primero su **Origen**. Para una luz frontal de prueba, elegir **Ubicación rápida → Frente de la sala**.
 2. Pulsar **Apuntar en la escena**. Se despeja la escena y la cámara queda temporalmente inmóvil.
 3. Dejar activado **Concentrar al apuntar** y tocar una superficie visible. El destino se actualiza, se muestra una cruz y vuelve el panel de esa misma luz. La apertura se reduce para distinguir la mancha; también se compensa la incidencia oblicua sobre la superficie. Desactivar Concentrar conserva el ancho existente. Tocar el fondo vacío no cambia nada; arrastrar o usar varios dedos tampoco elige un punto.
 4. Usar **Concentrado / Medio / Amplio** o **Ancho a esa distancia (m)** para variar el tamaño del haz. La dirección no cambia al modificar su ancho.

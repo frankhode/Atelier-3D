@@ -248,3 +248,121 @@ test("solo has a visible exit and each light offers moving its origin from the c
   assert.equal(f.document.querySelector("#lighting-solo").hidden, true);
   await f.window.happyDOM.close();
 });
+
+test("source XYZ controls and the plan appear before the destination and remain editable without losing focus", async () => {
+  const f = await fixture();
+  f.ui.focusLight(0);
+  const card = f.document.querySelector(".light-card[open]");
+  const origin = card.querySelector(".light-origin-controls"),
+    destination = card.querySelector(".light-target-controls");
+  assert.ok(
+    origin.compareDocumentPosition(destination) &
+      f.window.Node.DOCUMENT_POSITION_FOLLOWING,
+  );
+  const input = origin.querySelector('[data-path="lights.0.position.1"]');
+  assert.ok(input);
+  assert.equal(input.closest("details").className, "light-card");
+  input.focus();
+  input.value = "4.8";
+  input.dispatchEvent(new f.window.Event("input", { bubbles: true }));
+  assert.equal(f.state.lights[0].position[1], 4.8);
+  assert.equal(f.document.activeElement, input);
+  assert.ok(f.calls.includes("lights.0.position.1"));
+  await f.window.happyDOM.close();
+});
+test("one plan tap moves horizontal source coordinates while preserving height; drags do not place it", async () => {
+  const f = await fixture();
+  f.ui.focusLight(0);
+  const plan = f.document.querySelector('[data-light-plan="0"]'),
+    svg = plan.querySelector("svg");
+  svg.getBoundingClientRect = () => ({
+    left: 0,
+    top: 0,
+    width: 300,
+    height: 200,
+  });
+  const event = (type, x, y) =>
+    svg.dispatchEvent(
+      new f.window.PointerEvent(type, {
+        bubbles: true,
+        pointerId: 1,
+        button: 0,
+        clientX: x,
+        clientY: y,
+      }),
+    );
+  event("pointerdown", 150, 100);
+  event("pointerup", 150, 100);
+  const action = f.calls.at(-1);
+  assert.equal(action[0], "light-origin");
+  assert.equal(action[1][1], f.state.lights[0].position[1]);
+  assert.equal(action[2], "0");
+  assert.equal(action[1].length, 3);
+  const count = f.calls.length;
+  event("pointerdown", 150, 100);
+  event("pointermove", 150, 130);
+  event("pointerup", 150, 100);
+  assert.equal(f.calls.length, count);
+  await f.window.happyDOM.close();
+});
+test("source plan supports keyboard movement and origin presets without changing the destination", async () => {
+  const f = await fixture();
+  f.ui.focusLight(1);
+  const target = f.state.lights[1].target.slice(),
+    plan = f.document.querySelector('[data-light-plan="1"]');
+  plan.focus();
+  plan.dispatchEvent(
+    new f.window.KeyboardEvent("keydown", { bubbles: true, key: "ArrowRight" }),
+  );
+  const action = f.calls.at(-1);
+  assert.equal(action[0], "light-origin");
+  assert.equal(action[1][0], f.state.lights[1].position[0] + 0.25);
+  assert.deepEqual(f.state.lights[1].target, target);
+  const preset = f.document.querySelector('[data-origin-preset="1"]');
+  preset.value = "front";
+  preset.dispatchEvent(new f.window.Event("change", { bubbles: true }));
+  assert.deepEqual(f.calls.at(-1), ["origin-preset", "front", "1"]);
+  await f.window.happyDOM.close();
+});
+test("3D guides show source and direction, explicitly identify an offscreen origin, and hide completely", async () => {
+  const f = await fixture(),
+    rect = { left: 10, top: 20, width: 300, height: 200 };
+  f.ui.showLightOrigin(
+    0,
+    { x: 70, y: 80, visible: true, inFront: true },
+    { x: 160, y: 100, visible: true, inFront: true },
+    rect,
+  );
+  assert.equal(f.document.querySelector("#light-origin-marker").hidden, false);
+  assert.equal(
+    f.document.querySelector("#light-path-overlay").hasAttribute("hidden"),
+    false,
+  );
+  assert.equal(
+    f.document.querySelector("#light-path-overlay line").getAttribute("x1"),
+    "60",
+  );
+  assert.equal(
+    f.document.querySelector("#light-path-overlay line").getAttribute("x2"),
+    "150",
+  );
+  f.ui.showLightOrigin(
+    0,
+    { x: 400, y: 80, visible: false, inFront: true },
+    { x: 160, y: 100, inFront: true },
+    rect,
+  );
+  assert.equal(f.document.querySelector("#light-origin-marker").hidden, true);
+  assert.ok(
+    f.document
+      .querySelector("#light-origin-status")
+      .textContent.includes("fuera del encuadre"),
+  );
+  f.ui.hideLightTarget();
+  assert.equal(
+    f.document.querySelector("#light-path-overlay").hasAttribute("hidden"),
+    true,
+  );
+  assert.equal(f.document.querySelector("#light-origin-status").hidden, true);
+  await f.window.happyDOM.close();
+});
