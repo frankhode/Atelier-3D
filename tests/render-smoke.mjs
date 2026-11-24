@@ -3,7 +3,7 @@ import {spawn} from 'node:child_process';
 import {mkdir} from 'node:fs/promises';
 import {chromium} from 'playwright';
 
-const server=spawn('npm',['run','preview','--','--port','4179'],{stdio:['ignore','pipe','pipe']});
+const server=spawn('npm',['run','preview','--','--port','4179'],{stdio:['ignore','pipe','pipe'],detached:process.platform!=='win32'});
 let browser;let output='';const errors=[];
 server.stdout.on('data',v=>output+=v);server.stderr.on('data',v=>output+=v);
 const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
@@ -73,4 +73,4 @@ try {
  await page.screenshot({path:'artifacts/pictorial-mobile.png'});
  assert.deepEqual(errors,[],'The scene must compile its shaders and run without browser errors');
  console.log('WebGL render checks passed, including distinct plane values and a responsive painterly control.');
-} catch(error) { console.error('Browser diagnostics:',errors.map(message=>message.slice(0,1800))); throw error; } finally {await browser?.close();server.kill('SIGTERM');}
+} catch(error) { console.error('Browser diagnostics:',errors.map(message=>message.slice(0,1800))); throw error; } finally {await browser?.close();if(process.platform==='win32'){server.kill('SIGTERM');server.stdout.destroy();server.stderr.destroy();}else{try{process.kill(-server.pid,'SIGTERM');}catch(error){if(error.code!=='ESRCH')throw error;}}}
