@@ -48,6 +48,8 @@ try {
  assert.ok(baseline.left>baseline.floor+20,'The left wall must remain in a separate midtone');
  assert.ok(baseline.floor>8,'The floor must retain a dark readable value');
  assert.equal(await page.evaluate(()=>localStorage.getItem('atelier3d:composition:v1')),'physical-composition-untouched');
+ await mkdir('artifacts',{recursive:true});
+ await page.screenshot({path:'artifacts/pictorial-baseline.png'});
  await page.locator('[data-panel="lights"]').click();
  const range=page.locator('[data-path="pictorial.zones.left"]');
  await range.evaluate(el=>{el.value='0.6';el.dispatchEvent(new Event('input',{bubbles:true}));});
@@ -58,8 +60,15 @@ try {
  assert.ok(Math.abs(changed.back-baseline.back)<5,'Changing the left wall must preserve the back wall');
  assert.ok(Math.abs(changed.floor-baseline.floor)<5,'Changing the left wall must preserve the floor');
  await page.locator('#close-panel').click();
- await mkdir('artifacts',{recursive:true});
  await page.screenshot({path:'artifacts/pictorial-desktop.png'});
+ await page.locator('[data-panel="lights"]').click();
+ await page.locator('[data-action="pictorial-pick"]').click();
+ const canvas=await page.locator('#render-area canvas').boundingBox(),pick=projected([3.2,3,0]);
+ await page.mouse.click(canvas.x+pick[0]*canvas.width,canvas.y+(1-pick[1])*canvas.height);
+ await page.locator('#light-aim-bar').waitFor({state:'hidden'});
+ await page.waitForFunction(()=>{const saved=JSON.parse(localStorage.getItem('atelier3d:pictorial-study:v1')||'null');return saved&&Math.abs(saved.pictorial.center[0]-3.2)<.15;},undefined,{timeout:5000});
+ assert.equal(await page.evaluate(()=>localStorage.getItem('atelier3d:composition:v1')),'physical-composition-untouched');
+ await page.locator('#close-panel').click();
  await page.setViewportSize({width:390,height:780});await delay(250);
  await page.screenshot({path:'artifacts/pictorial-mobile.png'});
  assert.deepEqual(errors,[],'The scene must compile its shaders and run without browser errors');

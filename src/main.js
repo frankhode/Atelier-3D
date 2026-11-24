@@ -47,7 +47,10 @@ async function boot() {
         document.getElementById("light-aim-name").textContent = "Mancha pictórica";
         document.querySelector("#light-aim-bar span").textContent = "Tocá una superficie para centrar la mancha";
         ui.hideLightTarget();
-      } else previewTarget(index, true);
+      } else {
+        document.querySelector("#light-aim-bar span").textContent = "Tocá la superficie que querés iluminar";
+        previewTarget(index, true);
+      }
     },
     onMiss() {
       ui.notify("Tocá una superficie de la escena, no el fondo vacío.");
