@@ -1,3 +1,5 @@
+import { PictorialStudy } from "./pictorial-study.js";
+import { pictorialZone } from "../core/pictorial.js";
 import * as THREE from "three";
 import { OBJLoader } from "three/addons/loaders/OBJLoader.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
@@ -68,6 +70,7 @@ export class ModelManager {
       side: THREE.DoubleSide,
     });
     this.referenceText = null;
+    this.study = new PictorialStudy(state);
   }
   async parse(record) {
     if (record.kind === "builtin") {
@@ -118,6 +121,7 @@ export class ModelManager {
             : [node.material]
           ).forEach((m) => oldMaterials.add(m));
         node.material = this.material;
+        node.userData.pictorialZone = pictorialZone(node.name);
         node.castShadow = true;
         node.receiveShadow = true;
         const key = path || "0";
@@ -170,6 +174,13 @@ export class ModelManager {
       o.mesh.visible = !record.hidden.includes(o.key);
     });
     wrapper.updateMatrixWorld(true);
+    this.applyLook();
+  }
+  applyLook() {
+    this.study.apply();
+    for (const entry of this.entries.values()) for (const object of entry.objects) {
+      object.mesh.material = this.state.pictorial?.enabled ? this.study.materialFor(object.mesh.userData.pictorialZone || "other") : this.material;
+    }
   }
   remove(id) {
     const entry = this.entries.get(id);

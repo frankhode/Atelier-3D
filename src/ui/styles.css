@@ -1326,3 +1326,7 @@ body.aiming-light .view-tools {
     bottom: auto;
   }
 }
+
+.pictorial-zone { border-top: 1px solid var(--border); padding-top: 16px; margin-top: 16px; }
+.pictorial-zone .field { margin-bottom: 4px; }
+.pictorial-zone .toggle-row { color: var(--muted); font-size: 13px; }

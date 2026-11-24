@@ -1,7 +1,8 @@
+import { defaultPictorial, pictorialDemoProject } from "./core/pictorial.js";
 import "./ui/styles.css";
 import { defaultProject, MAX_PROJECT_BYTES } from "./core/defaults.js";
 import { validateProject, serializeProject } from "./core/project.js";
-import { readLocal, saveLocal, downloadFile } from "./core/storage.js";
+import { readLocal, saveLocal, downloadFile, STORAGE_KEY } from "./core/storage.js";
 import { Viewport } from "./scene/renderer.js";
 import { CameraRig } from "./scene/camera-rig.js";
 import { Lighting } from "./scene/lighting.js";
@@ -16,9 +17,12 @@ import { angleForDiameter, BEAM_PRESETS } from "./core/light-beam.js";
 import { ModelManager, recordFromFile } from "./scene/models.js";
 import { Interface } from "./ui/interface.js";
 
+const pictorialDemo = new URLSearchParams(location.search).get("pictorico") === "1";
+const activeStorageKey = pictorialDemo ? "atelier3d:pictorial-study:v1" : STORAGE_KEY;
 async function boot() {
-  const local = readLocal();
-  const state = local.project || defaultProject();
+  const local = readLocal(undefined, activeStorageKey);
+  const state = local.project || (pictorialDemo ? pictorialDemoProject(defaultProject()) : defaultProject());
+  let pickingPictorial = false;
   let ui,
     saveTimer,
     targetPreview = null,
@@ -39,12 +43,20 @@ async function boot() {
   const aimer = new LightAimer(viewport.renderer.domElement, rig, models, {
     onStart(index) {
       ui.setLightAiming(index);
-      previewTarget(index, true);
+      if (pickingPictorial) {
+        document.getElementById("light-aim-name").textContent = "Mancha pictórica";
+        document.querySelector("#light-aim-bar span").textContent = "Tocá una superficie para centrar la mancha";
+        ui.hideLightTarget();
+      } else {
+        document.querySelector("#light-aim-bar span").textContent = "Tocá la superficie que querés iluminar";
+        previewTarget(index, true);
+      }
     },
     onMiss() {
       ui.notify("Tocá una superficie de la escena, no el fondo vacío.");
     },
     onPick(index, point, normal) {
+      if (pickingPictorial) { state.pictorial.center = point.slice(); apply("pictorial.center"); ui.notify("Centro de la mancha actualizado."); return true; }
       const light = state.lights[index];
       const previous = { target: light.target, angle: light.angle };
       try {
@@ -63,12 +75,13 @@ async function boot() {
     },
     onEnd(index, picked) {
       ui.setLightAiming(null);
-      ui.focusLight(index);
+      if (pickingPictorial) { pickingPictorial = false; ui.open("lights"); } else ui.focusLight(index);
       if (!picked) hideTargetMarker();
     },
   });
   function updateTargetMarker() {
     if (!ui) return;
+    if (state.pictorial?.enabled) { ui.hideLightTarget(); return; }
     const index =
       ui.activePanel === "lights" ? ui.selectedLight : targetPreview?.index;
     if (index === undefined || index === null || !state.lights[index]) {
@@ -114,7 +127,7 @@ async function boot() {
   function save() {
     clearTimeout(saveTimer);
     rig.capture();
-    const result = saveLocal(state);
+    const result = saveLocal(state, undefined, activeStorageKey);
     ui.status(
       result === "complete"
         ? "Guardado en este dispositivo"
@@ -143,6 +156,10 @@ async function boot() {
   }
   function apply(path) {
     validateProject(state);
+    if (path.startsWith("pictorial.")) {
+      models.applyLook(); lighting.apply();
+      if (path === "pictorial.enabled") ui.refresh();
+    }
     if (path.startsWith("camera.")) {
       rig.restore();
       if (path === "camera.locked") ui.refresh();
@@ -230,7 +247,16 @@ async function boot() {
     },
     action: async (name, value, id) => {
       const model = state.models.find((m) => m.id === id);
-      if (name === "import") actions.importModel();
+      if (name === "pictorial-mode") {
+        state.pictorial.enabled = value === "true"; lighting.setSolo(null); ui.setSoloLight(null); apply("pictorial.enabled");
+      } else if (name === "pictorial-preset") {
+        state.pictorial = { ...defaultPictorial(), enabled: true }; apply("pictorial.enabled"); ui.notify("Mancha sobre fondo y escalera. Ajustá los valores de la izquierda y el piso.");
+      } else if (name === "pictorial-view") {
+        if (state.camera.locked) { ui.notify("Desbloqueá la cámara para usar la vista frontal."); return; }
+        const demo=pictorialDemoProject(defaultProject()); state.camera=demo.camera; state.frame=demo.frame; rig.restore(); viewport.resize(); changed();
+      } else if (name === "pictorial-pick") {
+        pickingPictorial = true; aimer.start(0);
+      } else if (name === "import") actions.importModel();
       else if (name === "projection") {
         rig.setProjection(value);
         ui.refresh();
@@ -365,7 +391,7 @@ async function boot() {
             "¿Restablecer la sala de prueba? Exportá antes un JSON si querés conservar esta composición.",
           )
         )
-          await withBusy(() => replaceProject(defaultProject()));
+          await withBusy(() => replaceProject(pictorialDemo ? pictorialDemoProject(defaultProject()) : defaultProject()));
       } else if (name === "png") {
         viewport.render(rig.camera);
         viewport.renderer.domElement.toBlob((blob) => {
@@ -471,7 +497,7 @@ async function boot() {
     const staged = await models.prepareProject(state);
     staged.forEach((entry) => models.mount(entry));
     viewport.applyAppearance();
-    if (!local.project) initialCamera();
+    if (!local.project && !pictorialDemo) initialCamera();
     ui.update();
     ui.status("Guardado en este dispositivo");
     if (local.error)
@@ -518,7 +544,7 @@ boot().catch((error) => {
   reset.onclick = () => {
     if (confirm("¿Borrar el guardado local y volver a la sala de prueba?")) {
       try {
-        localStorage.removeItem("atelier3d:composition:v1");
+        localStorage.removeItem(activeStorageKey);
       } catch {}
       location.reload();
     }
