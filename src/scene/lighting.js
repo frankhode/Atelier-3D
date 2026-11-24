@@ -1,0 +1,54 @@
+import * as THREE from "three";
+export class Lighting {
+  constructor(scene, state) {
+    this.scene = scene;
+    this.state = state;
+    this.ambient = new THREE.AmbientLight(0xffffff, 0.12);
+    scene.add(this.ambient);
+    this.lights = state.lights.map(() => {
+      const light = new THREE.SpotLight(0xffffff, 100, 0, Math.PI / 4, 0.5, 2);
+      light.shadow.bias = -0.0001;
+      light.shadow.normalBias = 0.015;
+      light.shadow.camera.near = 0.05;
+      light.shadow.camera.far = 200;
+      scene.add(light, light.target);
+      return light;
+    });
+    this.helpers = this.lights.map((light) => {
+      const helper = new THREE.SpotLightHelper(light, 0xd0b77b);
+      scene.add(helper);
+      return helper;
+    });
+    this.axes = new THREE.AxesHelper(1.4);
+    this.axes.position.set(0, 0.02, 6.5);
+    scene.add(this.axes);
+    this.grid = new THREE.GridHelper(24, 24, 0x73847f, 0x444c4c);
+    this.grid.position.set(4.1, -0.21, 3.25);
+    scene.add(this.grid);
+    this.apply();
+  }
+  apply() {
+    this.ambient.intensity = this.state.appearance.ambient;
+    const mapSize = this.state.appearance.quality === "high" ? 2048 : 1024;
+    this.lights.forEach((light, i) => {
+      const s = this.state.lights[i];
+      light.visible = s.enabled;
+      light.intensity = s.intensity;
+      light.position.fromArray(s.position);
+      light.target.position.fromArray(s.target);
+      light.angle = THREE.MathUtils.degToRad(s.angle);
+      light.penumbra = s.penumbra;
+      light.castShadow = s.shadows;
+      if (light.shadow.mapSize.x !== mapSize) {
+        light.shadow.map?.dispose();
+        light.shadow.map = null;
+        light.shadow.mapSize.set(mapSize, mapSize);
+      }
+      light.target.updateMatrixWorld();
+      light.updateMatrixWorld();
+      this.helpers[i].visible = this.state.appearance.helpers && s.enabled;
+      this.helpers[i].update();
+    });
+    this.axes.visible = this.grid.visible = this.state.appearance.helpers;
+  }
+}
