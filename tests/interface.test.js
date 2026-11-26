@@ -37,21 +37,31 @@ async function fixture() {
   const ui = new Interface(state, models, actions);
   return { window, state, models, calls, ui, document: window.document };
 }
-test("panels open one at a time and close when clicking outside", async () => {
-  const f = await fixture(),
-    d = f.document;
+test("the single menu starts closed, opens one panel at a time and leaves the scene usable", async () => {
+  const f = await fixture(), d = f.document;
+  const menu = d.querySelector("#main-menu"), toggle = d.querySelector("#menu-toggle");
+  assert.equal(menu.hidden,true);
+  assert.equal(d.querySelector("#panel").hidden,true);
+  toggle.click();
+  assert.equal(menu.hidden,false);
+  assert.equal(toggle.getAttribute("aria-expanded"),"true");
   d.querySelector('[data-panel="objects"]').click();
-  assert.equal(d.querySelector("#panel").hidden, false);
-  assert.equal(f.ui.activePanel, "objects");
-  assert.equal(d.querySelectorAll(".object-row").length, 64);
+  assert.equal(menu.hidden,true);
+  assert.equal(d.querySelector("#panel").hidden,false);
+  assert.equal(f.ui.activePanel,"objects");
+  assert.equal(d.querySelectorAll(".object-row").length,64);
+  toggle.click();
   d.querySelector('[data-panel="camera"]').click();
-  assert.equal(f.ui.activePanel, "camera");
-  assert.equal(d.querySelectorAll('[aria-expanded="true"]').length, 1);
-  d.querySelector("#viewport").dispatchEvent(
-    new f.window.PointerEvent("pointerdown", { bubbles: true }),
-  );
-  assert.equal(f.ui.activePanel, null);
-  assert.equal(d.querySelector("#panel").hidden, true);
+  assert.equal(f.ui.activePanel,"camera");
+  assert.equal(d.querySelectorAll('[data-panel][aria-expanded="true"]').length,1);
+  toggle.click();
+  d.querySelector("#viewport").dispatchEvent(new f.window.PointerEvent("pointerdown",{bubbles:true}));
+  assert.equal(menu.hidden,true);
+  assert.equal(f.ui.activePanel,"camera","the editor remains open when navigating the scene");
+  d.querySelector("#close-panel").click();
+  assert.equal(f.ui.activePanel,null);
+  assert.equal(d.querySelector("#panel").hidden,true);
+  assert.equal(toggle.getAttribute("aria-expanded"),"false");
   await f.window.happyDOM.close();
 });
 test("composition title editing updates state and preserves focus", async () => {
@@ -193,11 +203,11 @@ test("aim mode frees the scene, announces the selected light and returns to its 
   assert.ok(
     f.document.getElementById("light-aim-name").textContent.includes("Luz 2"),
   );
-  assert.equal(f.document.querySelector(".dock").inert, true);
+  assert.equal(f.document.querySelector("#menu-toggle").inert, true);
   assert.equal(f.document.activeElement.id, "cancel-light-aim");
   f.ui.setLightAiming(null);
   f.ui.focusLight(1);
-  assert.equal(f.document.querySelector(".dock").inert, false);
+  assert.equal(f.document.querySelector("#menu-toggle").inert, false);
   assert.equal(
     f.document.querySelector(".light-card[open]").dataset.light,
     "1",

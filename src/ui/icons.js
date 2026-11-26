@@ -1,4 +1,7 @@
 const paths = {
+  menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
+  fullscreen: '<path d="M9 3H3v6m12-6h6v6M3 15v6h6m12-6v6h-6"/>',
+  minimize: '<path d="M3 9h6V3m12 6h-6V3M3 15h6v6m12-6h-6v6"/>',
   target:
     '<circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4"/>',
   objects: '<path d="m12 3 9 5-9 5-9-5 9-5Zm-9 9 9 5 9-5M3 16l9 5 9-5"/>',
@@ -29,3 +32,4 @@ export function hydrateIcons(root = document) {
     el.innerHTML = icon(el.dataset.icon);
   });
 }
+

@@ -41,9 +41,16 @@ export class Interface {
     this.selectedLight = 0;
     this.concentrateOnAim = [true, true, true];
     this.soloLight = null;
+    this.menu = document.getElementById("main-menu");
+    this.menuToggle = document.getElementById("menu-toggle");
     this.panel = document.getElementById("panel");
     this.body = document.getElementById("panel-body");
     hydrateIcons();
+    this.menuToggle.onclick = () => this.setMenu(this.menu.hidden);
+    const fullscreen = document.getElementById("fullscreen-toggle");
+    fullscreen.onclick = () => this.toggleFullscreen();
+    document.addEventListener("fullscreenchange", () => this.updateFullscreen());
+    this.updateFullscreen();
     document
       .querySelectorAll("[data-panel]")
       .forEach((b) =>
@@ -54,17 +61,18 @@ export class Interface {
         ),
       );
     document.getElementById("close-panel").onclick = () => this.open(null);
-    document.getElementById("import-model").onclick = () =>
-      actions.importModel();
+    document.getElementById("import-model").onclick = () => {
+      this.setMenu(false); actions.importModel();
+    };
     document.getElementById("camera-lock").onclick = () => {
+      this.setMenu(false);
       actions.lock();
+      this.update();
       this.refresh();
     };
-    document.getElementById("fit-camera").onclick = () => actions.fit();
-    document.getElementById("lighting-solo").onclick = () =>
-      actions.action("solo-light", "clear");
-    document.getElementById("help-button").onclick = () =>
-      document.getElementById("help-dialog").showModal();
+    document.getElementById("fit-camera").onclick = () => { this.setMenu(false); actions.fit(); };
+    document.getElementById("lighting-solo").onclick = () => { this.setMenu(false); actions.action("solo-light", "clear"); };
+    document.getElementById("help-button").onclick = () => { this.setMenu(false); document.getElementById("help-dialog").showModal(); };
     document.getElementById("close-help").onclick = () =>
       document.getElementById("help-dialog").close();
     document.getElementById("help-dialog").addEventListener("click", (e) => {
@@ -80,11 +88,15 @@ export class Interface {
       }
     });
     document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") this.open(null);
+      if (e.key === "Escape") {
+        if (!this.menu.hidden) this.setMenu(false);
+        else if (this.activePanel) this.open(null);
+      }
     });
     document.addEventListener("pointerdown", (e) => {
-      if (this.activePanel && !e.target.closest("#panel, .dock, dialog"))
-        this.open(null);
+      if (!this.menu.hidden && !e.target.closest("#main-menu, #menu-toggle"))
+        this.setMenu(false);
+      // The scene and the docked editor remain independently interactive.
     });
     this.body.addEventListener("input", (e) => this.handleInput(e));
     this.body.addEventListener("change", (e) => {
@@ -190,9 +202,35 @@ export class Interface {
   triple(path, label) {
     return `<div class="field"><span class="field-label">${label}</span><div class="triple">${["X", "Y", "Z"].map((axis, i) => `<label>${axis}<input type="number" aria-label="${label} ${axis}" data-path="${path}.${i}" value="${Number(get(this.state, path)[i].toFixed(3))}" step="any" min="-100000" max="100000"></label>`).join("")}</div></div>`;
   }
+  setMenu(open) {
+    this.menu.hidden = !open;
+    this.menuToggle.setAttribute("aria-expanded", String(open));
+    this.menuToggle.setAttribute("aria-label", open ? "Cerrar menú" : "Abrir menú");
+    this.menuToggle.innerHTML = icon(open ? "close" : "menu");
+  }
+  updateFullscreen() {
+    const button = document.getElementById("fullscreen-toggle");
+    const supported = !!document.fullscreenEnabled && typeof document.documentElement.requestFullscreen === "function";
+    button.hidden = !supported;
+    const active = !!document.fullscreenElement;
+    const label = active ? "Salir de pantalla completa" : "Pantalla completa";
+    button.innerHTML = icon(active ? "minimize" : "fullscreen") + "<span>" + label + "</span>";
+    button.setAttribute("aria-label", label);
+  }
+  async toggleFullscreen() {
+    this.setMenu(false);
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else if (document.fullscreenEnabled) await document.documentElement.requestFullscreen();
+      else this.actions.notify("El navegador no permite salir del área disponible.");
+    } catch { this.actions.notify("El navegador no permitió activar pantalla completa."); }
+    this.updateFullscreen();
+  }
   open(name) {
+    this.setMenu(false);
     this.activePanel = name;
     this.panel.hidden = !name;
+    this.panel.dataset.kind = name || "";
     document.body.classList.toggle("panel-open", !!name);
     document
       .querySelectorAll("[data-panel]")
@@ -208,6 +246,7 @@ export class Interface {
   refresh() {
     if (!this.activePanel) return;
     const [kicker, title] = labels[this.activePanel];
+    this.panel.dataset.kind = this.activePanel === "lights" && this.state.surfaces?.enabled ? "surface" : this.activePanel;
     document.getElementById("panel-kicker").textContent = kicker;
     document.getElementById("panel-title").textContent = this.activePanel === "lights" && this.state.pictorial?.enabled ? "Estudio pictórico" : this.activePanel === "lights" && this.state.surfaces?.enabled ? "Paredes luminosas" : title;
     this.body.innerHTML = this[this.activePanel]();
@@ -225,7 +264,7 @@ export class Interface {
     document.getElementById("projection-label").textContent =
       (c.projection === "perspective" ? "Perspectiva" : "Ortogonal") + (this.state.pictorial?.enabled ? " · Pictórico" : this.state.surfaces?.enabled ? " · Superficies" : "");
     const lock = document.getElementById("camera-lock");
-    lock.innerHTML = icon(c.locked ? "lock" : "unlock");
+    lock.innerHTML = icon(c.locked ? "lock" : "unlock") + "<span>" + (c.locked ? "Desbloquear cámara" : "Bloquear cámara") + "</span>";
     lock.classList.toggle("active", c.locked);
     lock.setAttribute(
       "aria-label",
@@ -266,7 +305,7 @@ export class Interface {
     document.body.classList.toggle("aiming-light", active);
     document.getElementById("light-aim-bar").hidden = !active;
     document
-      .querySelectorAll(".topbar, .view-tools, .dock, #panel")
+      .querySelectorAll("#menu-toggle, #main-menu, #panel")
       .forEach((el) => {
         el.inert = active;
       });
@@ -545,16 +584,20 @@ export class Interface {
     </div>`;
   }
   surfacePanel() {
+    const room = this.state.models.find(m=>m.id==="sala-v04" && m.visible);
+    const hint = !room ? "Los rebotes requieren la sala de referencia." :
+      this.models.bounceStudy?.error ? "Mapa de rebotes no disponible." :
+      !this.models.bounceStudy?.ready ? "Cargando rebotes…" :
+      room.hidden.length ? "Rebotes de la sala completa." : "";
+    const labels = {upper:"Planta alta",left:"Lateral izq.",right:"Lateral der."};
     return this.lightingModes() +
       '<div class="surface-controls">' +
-      SURFACE_GROUPS.map(({key,label}) => '<section class="section">' + this.pictRange('surfaces.'+key,label,0,2,.01) + '</section>').join('') +
-      '<section class="section bounce-section">' + this.pictRange('surfaces.bounce','Luz rebotada',0,2,.01) +
-      '<p class="hint">0% · solo luz directa. 100% · dos rebotes difusos.</p>' +
-      (!this.state.models.some(m=>m.id==="sala-v04" && m.visible) ? '<p class="hint">Requiere la sala de referencia visible.</p>' :
-      this.models.bounceStudy?.error ? '<p class="hint">Mapa de rebotes no disponible.</p>' :
-      this.models.bounceStudy?.ready ? (this.state.models.find(m=>m.id==="sala-v04")?.hidden.length ? '<p class="hint">El mapa conserva los rebotes de la sala completa.</p>' : '') : '<p class="hint">Cargando mapa de rebotes…</p>') +
-      '</section>' +
-      '<button class="button full" data-action="surface-reset">' + icon("reset") + 'Restablecer intensidades</button></div>';
+      SURFACE_GROUPS.map(({key,label}) => '<div class="surface-control" title="'+esc(label)+'">' +
+        this.pictRange('surfaces.'+key,labels[key],0,2,.01) + '</div>').join('') +
+      '<div class="surface-control bounce-control" title="0% · directa; 100% · dos rebotes difusos">' +
+        this.pictRange('surfaces.bounce','Rebotes',0,2,.01) + '</div>' +
+      (hint ? '<p class="hint surface-note">'+hint+'</p>' : '') +
+      '<button class="button surface-reset" data-action="surface-reset" title="Restablecer intensidades">'+icon("reset")+'Restablecer</button></div>';
   }
   pictRange(path,label,min=0,max=1,step=.01,suffix='%',scale=100) {
     const value=get(this.state,path),shown=Math.round(value*scale*100)/100;

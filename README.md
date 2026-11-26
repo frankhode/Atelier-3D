@@ -153,3 +153,9 @@ node scripts/bake-bounces.mjs
 ```
 
 El mapa contiene la firma de las fuentes y de la geometría original para detectar incompatibilidades. Está anclado a la sala: sigue su posición, rotación y escala. Las figuras OBJ/GLB reciben iluminación difusa según su posición y orientación, pero sus aportes reflectantes y su oclusión indirecta no se precalculan; mantienen las sombras directas. Ocultar piezas tampoco recalcula el mapa (se conserva la arquitectura completa). La solución es una aproximación de claroscuro, no un trazador de caminos general ni iluminación global en tiempo real.
+
+## Área de trabajo despejada
+
+El visor ocupa toda el área disponible. **☰** abre el menú general (Objetos, Cámara, Luces, Encuadre, Archivo, importación, bloqueo, encuadre, ayuda y pantalla completa cuando el navegador la admite). No hay barras ni títulos superpuestos de forma permanente.
+
+Los controles se abren en un panel lateral en escritorio y horizontal en el teléfono en orientación vertical, reservando espacio propio sin cubrir la escena. En **Superficies**, las cuatro intensidades aparecen en una grilla compacta en móvil. El visor sigue siendo navegable mientras el editor está abierto; cerrarlo recupera toda la pantalla sin cambiar los parámetros de cámara ni de iluminación.

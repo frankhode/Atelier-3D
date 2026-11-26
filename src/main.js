@@ -255,7 +255,7 @@ async function boot() {
   const actions = {
     changed,
     apply,
-    panelChanged: () => viewport.requestRender(),
+    panelChanged: () => viewport.resize(),
     notify: (message) => ui.notify(message),
     importModel: () => document.getElementById("model-input").click(),
     lock: () => rig.lock(),

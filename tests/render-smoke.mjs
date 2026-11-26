@@ -11,6 +11,19 @@ try {
  for(let i=0;i<60;i++){try{const response=await fetch('http://127.0.0.1:4179/');if(response.ok)break;}catch{}await delay(250);if(i===59)throw Error('Preview did not start: '+output);}
  browser=await chromium.launch({headless:true,args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--disable-dev-shm-usage']});
  const page=await browser.newPage({viewport:{width:1000,height:800}});
+ async function openPanel(name){
+   await page.locator('#menu-toggle').click();
+   await page.locator('#main-menu [data-panel="'+name+'"]').click();
+   await delay(120);
+ }
+ async function layout(){
+   return page.evaluate(()=>{
+     const r=el=>{const b=el.getBoundingClientRect();return {x:b.x,y:b.y,width:b.width,height:b.height,right:b.right,bottom:b.bottom};};
+     return {app:r(document.querySelector('#app')),view:r(document.querySelector('#viewport')),
+       panel:r(document.querySelector('#panel')),menuHidden:document.querySelector('#main-menu').hidden};
+   });
+ }
+
  page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
  await page.addInitScript(()=>{
    localStorage.setItem('atelier3d:composition:v1','physical-composition-untouched');
@@ -49,8 +62,13 @@ try {
  assert.ok(baseline.floor>8,'The floor must retain a dark readable value');
  assert.equal(await page.evaluate(()=>localStorage.getItem('atelier3d:composition:v1')),'physical-composition-untouched');
  await mkdir('artifacts',{recursive:true});
+ const clean=await layout();
+ assert.equal(clean.menuHidden,true);
+ assert.equal(clean.view.width,clean.app.width);assert.equal(clean.view.height,clean.app.height);
  await page.screenshot({path:'artifacts/pictorial-baseline.png'});
- await page.locator('[data-panel="lights"]').click();
+ await openPanel('lights');
+ const docked=await layout();
+ assert.ok(docked.view.right<=docked.panel.x+1,'Desktop panel cannot overlap scene');
  const range=page.locator('[data-path="pictorial.zones.left"]');
  await range.evaluate(el=>{el.value='0.6';el.dispatchEvent(new Event('input',{bubbles:true}));});
  await page.waitForFunction(([x,y,min])=>{const f=window.__studyFrame,at=4*(Math.round(y*f.height)*f.width+Math.round(x*f.width));return f.pixels[at]>min;},[...projected([0,3.6,1]),baseline.left+40],{timeout:15000});
@@ -61,8 +79,9 @@ try {
  assert.ok(Math.abs(changed.floor-baseline.floor)<5,'Changing the left wall must preserve the floor');
  await page.locator('#close-panel').click();
  await page.screenshot({path:'artifacts/pictorial-desktop.png'});
- await page.locator('[data-panel="lights"]').click();
+ await openPanel('lights');
  await page.locator('[data-action="pictorial-pick"]').click();
+ await delay(180);
  const canvas=await page.locator('#render-area canvas').boundingBox(),pick=projected([3.2,3,0]);
  await page.mouse.click(canvas.x+pick[0]*canvas.width,canvas.y+(1-pick[1])*canvas.height);
  await page.locator('#light-aim-bar').waitFor({state:'hidden'});
@@ -72,10 +91,10 @@ try {
  await page.setViewportSize({width:390,height:780});await delay(250);
  await page.screenshot({path:'artifacts/pictorial-mobile.png'});
  // Verify the new surface mode against the actual framebuffer, not only light uniforms.
- await page.setViewportSize({width:1000,height:800});
+ await page.setViewportSize({width:1350,height:800});
  await page.goto('http://127.0.0.1:4179/?superficies=1');
  await page.locator('#loading').waitFor({state:'hidden',timeout:30000});
- await page.locator('[data-panel="lights"]').click();
+ await openPanel('lights');
  assert.equal(await page.locator('#panel-title').textContent(),'Paredes luminosas');
  assert.equal(await page.locator('input[type="range"]').count(),4);
  const setSurface=async(key,value)=>{
@@ -103,7 +122,7 @@ try {
  const surfaceMain=await mean();
  await page.locator('#close-panel').click();
  await page.screenshot({path:'artifacts/surface-main.png'});
- await page.locator('[data-panel="lights"]').click();
+ await openPanel('lights');
  await freshFrame(()=>setSurface('upper',0));
  const surfaceDark=await mean();
  await freshFrame(()=>setSurface('right',0.4));
@@ -118,7 +137,7 @@ try {
  assert.ok(lateralReflected>surfaceFill+5,'The right-hand source must generate independent diffuse bounces.');
  await page.locator('#close-panel').click();
  await page.screenshot({path:'artifacts/lateral-right.png'});
- await page.locator('[data-panel="lights"]').click();
+ await openPanel('lights');
  await page.locator('[data-action="surface-reset"]').click();
  await page.waitForFunction(()=>{const saved=JSON.parse(localStorage.getItem('atelier3d:surface-study:v1')||'null');return saved?.surfaces?.enabled&&saved.surfaces.upper===1&&saved.surfaces.right===.08;},undefined,{timeout:5000});
  assert.equal(await page.evaluate(()=>localStorage.getItem('atelier3d:composition:v1')),'physical-composition-untouched');
@@ -126,10 +145,10 @@ try {
  await page.screenshot({path:'artifacts/surface-mobile.png'});
  // Isolate the upper source and confirm that real pixels in shadow respond to
  // the indirect field. Turning off the source must also turn off its bounces.
- await page.setViewportSize({width:1000,height:800});
+ await page.setViewportSize({width:1350,height:800});
  await page.goto('http://127.0.0.1:4179/?rebotes=1');
  await page.locator('#loading').waitFor({state:'hidden',timeout:30000});
- await page.locator('[data-panel="lights"]').click();
+ await openPanel('lights');
  assert.equal(await page.locator('[data-output="surfaces.bounce"]').textContent(),'35%');
  const shadowMean=()=>page.evaluate(()=>{
    const f=window.__studyFrame;let sum=0,count=0;
@@ -142,7 +161,7 @@ try {
  const shadowDirect=await shadowMean();
  await page.locator('#close-panel').click();
  await page.screenshot({path:'artifacts/bounces-direct.png'});
- await page.locator('[data-panel="lights"]').click();
+ await openPanel('lights');
  await freshFrame(()=>setSurface('bounce',.35));
  const shadow35=await shadowMean();
  await freshFrame(()=>setSurface('bounce',1));
@@ -152,7 +171,7 @@ try {
  assert.ok(shadow100>shadow35+8,'Increasing the bounce gain must lift the shadow.');
  await page.locator('#close-panel').click();
  await page.screenshot({path:'artifacts/bounces-100.png'});
- await page.locator('[data-panel="lights"]').click();
+ await openPanel('lights');
  await freshFrame(()=>setSurface('upper',0));
  assert.ok(await mean()<5,'Turning off all sources also eliminates all indirect light.');
  await page.locator('[data-action="surface-reset"]').click();
@@ -160,7 +179,24 @@ try {
  assert.equal(await page.evaluate(()=>localStorage.getItem('atelier3d:composition:v1')),'physical-composition-untouched');
  assert.ok(await page.evaluate(()=>JSON.parse(localStorage.getItem('atelier3d:surface-study:v1')).surfaces.enabled),'the previous surface study remains stored separately');
  await page.setViewportSize({width:390,height:780});await delay(350);
+ const mobileDocked=await layout();
+ assert.ok(mobileDocked.view.bottom<=mobileDocked.panel.y+1,'Mobile panel cannot overlap scene');
+ assert.ok(mobileDocked.view.height>mobileDocked.app.height*.6,'Scene keeps most of the mobile area');
+ const slideBoxes=await page.locator('.surface-controls input[type="range"]').evaluateAll(els=>els.map(e=>{const b=e.getBoundingClientRect();return {top:b.top,bottom:b.bottom}}));
+ assert.equal(slideBoxes.length,4);
+ assert.ok(slideBoxes.every(b=>b.top>=mobileDocked.panel.y&&b.bottom<=mobileDocked.panel.bottom),'All four light sliders fit without scrolling on the tested phone');
  await page.screenshot({path:'artifacts/bounces-mobile.png'});
+ const beforeClose=await page.evaluate(()=>JSON.parse(localStorage.getItem('atelier3d:bounce-study:v1')).camera);
+ await page.locator('#close-panel').click();await delay(250);
+ const mobileClean=await layout();
+ assert.equal(mobileClean.view.height,mobileClean.app.height);
+ assert.equal(mobileClean.view.width,mobileClean.app.width);
+ await page.screenshot({path:'artifacts/immersive-mobile.png'});
+ await page.locator('#menu-toggle').click();
+ await page.screenshot({path:'artifacts/immersive-menu.png'});
+ await page.locator('#menu-toggle').click();
+ assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('atelier3d:bounce-study:v1')).camera),beforeClose,'Opening and closing editor must not alter saved camera');
+
  assert.deepEqual(errors,[],'The scene must compile its shaders and run without browser errors');
  console.log('WebGL render checks passed, including distinct plane values and a responsive painterly control.');
 } catch(error) { console.error('Browser diagnostics:',errors.map(message=>message.slice(0,1800))); throw error; } finally {await browser?.close();if(process.platform==='win32'){server.kill('SIGTERM');server.stdout.destroy();server.stderr.destroy();}else{try{process.kill(-server.pid,'SIGTERM');}catch(error){if(error.code!=='ESRCH')throw error;}}}

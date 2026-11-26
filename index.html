@@ -22,61 +22,33 @@
           <i></i><i></i><i></i><i></i>
         </div>
       </main>
-      <header class="topbar">
-        <div class="brand">
-          <span class="brand-symbol" aria-hidden="true">a<span>3</span></span>
-          <div>
-            <h1>Atelier <span>3D</span></h1>
-            <p>Estudio de composición</p>
-          </div>
+      <button id="menu-toggle" class="icon-button menu-toggle" aria-label="Abrir menú" aria-expanded="false" aria-controls="main-menu" title="Menú">
+        <span data-icon="menu"></span>
+      </button>
+      <nav id="main-menu" class="main-menu" aria-label="Menú general de Atelier 3D" hidden>
+        <div class="menu-project">
+          <span class="menu-brand">Atelier 3D</span>
+          <h2 id="scene-title">Sala de doble altura</h2>
+          <p id="scene-subtitle">8,20 × 6,50 × 5,60 m</p>
+          <p id="projection-label">Perspectiva</p>
         </div>
-        <div class="top-actions">
-          <button
-            id="import-model"
-            class="button import-button"
-            title="Importar OBJ o GLB"
-          >
-            <span data-icon="import"></span><span>Importar modelo</span></button
-          ><button
-            id="help-button"
-            class="icon-button"
-            aria-label="Ayuda"
-            title="Ayuda"
-          >
-            <span data-icon="help"></span>
-          </button>
+        <div class="menu-tools">
+          <button data-panel="objects" aria-expanded="false"><span data-icon="objects"></span><span>Objetos</span></button>
+          <button data-panel="camera" aria-expanded="false"><span data-icon="camera"></span><span>Cámara</span></button>
+          <button data-panel="lights" aria-expanded="false"><span data-icon="sun"></span><span>Luces</span></button>
+          <button data-panel="frame" aria-expanded="false"><span data-icon="frame"></span><span>Encuadre</span></button>
+          <button data-panel="project" aria-expanded="false"><span data-icon="folder"></span><span>Archivo</span></button>
         </div>
-      </header>
-      <div class="scene-heading">
-        <span class="eyebrow">COMPOSICIÓN</span>
-        <h2 id="scene-title">Sala de doble altura</h2>
-        <p id="scene-subtitle">8,20 × 6,50 × 5,60 m</p>
-      </div>
-      <div class="view-tools">
-        <button
-          id="lighting-solo"
-          class="view-badge solo-badge"
-          hidden
-          title="Mostrar todas las luces"
-          aria-label="Salir de la vista de una sola luz"
-        ></button>
-        <span id="projection-label" class="view-badge">Perspectiva</span
-        ><button
-          id="camera-lock"
-          class="icon-button"
-          aria-label="Bloquear cámara"
-          title="Bloquear cámara"
-        >
-          <span data-icon="unlock"></span></button
-        ><button
-          id="fit-camera"
-          class="icon-button"
-          aria-label="Encuadrar todos los objetos"
-          title="Encuadrar todos los objetos"
-        >
-          <span data-icon="fit"></span>
-        </button>
-      </div>
+        <div class="menu-tools menu-actions">
+          <button id="import-model" title="Importar OBJ o GLB"><span data-icon="import"></span><span>Importar modelo</span></button>
+          <button id="camera-lock" aria-label="Bloquear cámara" title="Bloquear cámara"><span data-icon="unlock"></span><span>Bloquear cámara</span></button>
+          <button id="fit-camera" aria-label="Encuadrar todos los objetos" title="Encuadrar todos los objetos"><span data-icon="fit"></span><span>Encuadrar todo</span></button>
+          <button id="fullscreen-toggle" aria-label="Pantalla completa"><span data-icon="fullscreen"></span><span>Pantalla completa</span></button>
+          <button id="help-button" aria-label="Ayuda" title="Ayuda"><span data-icon="help"></span><span>Ayuda</span></button>
+        </div>
+        <button id="lighting-solo" class="menu-solo" hidden title="Mostrar todas las luces" aria-label="Salir de la vista de una sola luz"></button>
+        <div id="save-status" class="menu-status" role="status">Cargando escena…</div>
+      </nav>
       <aside
         id="panel"
         class="panel"
@@ -98,28 +70,6 @@
         </div>
         <div id="panel-body" class="panel-body"></div>
       </aside>
-      <footer class="scene-footer">
-        <div class="axis-key" title="Sistema de coordenadas sin reflexión">
-          <span class="axis-x">X</span><span class="axis-y">Y</span
-          ><span class="axis-z">Z</span
-          ><span class="axis-description">Y arriba · +Z al observador</span>
-        </div>
-        <span id="save-status" role="status">Cargando escena…</span>
-      </footer>
-      <nav class="dock" aria-label="Herramientas">
-        <button data-panel="objects" aria-expanded="false">
-          <span data-icon="objects"></span><span>Objetos</span></button
-        ><button data-panel="camera" aria-expanded="false">
-          <span data-icon="camera"></span><span>Cámara</span></button
-        ><button data-panel="lights" aria-expanded="false">
-          <span data-icon="sun"></span><span>Luces</span></button
-        ><span class="dock-divider"></span
-        ><button data-panel="frame" aria-expanded="false">
-          <span data-icon="frame"></span><span>Encuadre</span></button
-        ><button data-panel="project" aria-expanded="false">
-          <span data-icon="folder"></span><span>Archivo</span>
-        </button>
-      </nav>
       <div id="light-aim-bar" class="light-aim-bar" hidden>
         <div role="status">
           <strong id="light-aim-name"></strong
@@ -187,8 +137,10 @@
             </dd>
             <dt>Conservar un punto de vista</dt>
             <dd>
-              Bloqueá la cámara con el candado. Volvé a pulsarlo para navegar.
+              Bloqueá la cámara desde el menú general o desde Cámara. Volvé a desbloquearla para navegar.
             </dd>
+            <dt>Área de trabajo</dt>
+            <dd>Todas las herramientas están en el menú ☰. Los paneles reservan su propio espacio sin cubrir la escena; cerralos para recuperar toda la pantalla. Si el navegador lo admite, elegí Pantalla completa.</dd>
             <dt>Guardar y compartir</dt>
             <dd>
               Los parámetros se guardan en este navegador. Exportá un JSON desde
@@ -221,3 +173,4 @@
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>
+

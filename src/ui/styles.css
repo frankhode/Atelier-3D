@@ -1341,3 +1341,227 @@ body.aiming-light .view-tools {
 .surface-controls .bounce-section { border-top: 1px solid #3b4946; padding-top: 10px; }
 .surface-controls p.hint { margin: 5px 0 0; font-size: 12px; line-height: 1.35; }
 .surface-controls .button { margin-bottom: 0; }
+
+/* Immersive workspace: one menu and a docked editor, never an overlay over
+   the rendered scene. Keep the canvas itself sized by Viewport.resize(). */
+#app {
+  display: flex;
+  flex-direction: row;
+}
+#viewport {
+  position: relative;
+  inset: auto;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+}
+.menu-toggle {
+  position: absolute;
+  z-index: 45;
+  top: calc(10px + env(safe-area-inset-top));
+  left: calc(10px + env(safe-area-inset-left));
+  width: 42px;
+  min-height: 42px;
+  border-radius: 9px;
+  background: #202528bb;
+  color: #e1e8e4;
+  backdrop-filter: blur(12px);
+}
+.menu-toggle[aria-expanded="true"] {
+  background: #3c4945;
+  color: #e1e8e4;
+}
+.main-menu {
+  position: absolute;
+  z-index: 40;
+  top: calc(60px + env(safe-area-inset-top));
+  left: calc(10px + env(safe-area-inset-left));
+  width: min(320px, calc(100% - 20px - env(safe-area-inset-left) - env(safe-area-inset-right)));
+  max-height: calc(100dvh - 72px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 14px;
+  border: 1px solid #ffffff20;
+  border-radius: 12px;
+  background: #22282bf9;
+  box-shadow: 0 12px 40px #0005;
+  scrollbar-width: thin;
+}
+.menu-project {
+  padding: 1px 5px 11px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 9px;
+}
+.menu-brand {
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.menu-project h2 {
+  font-size: 16px;
+  font-weight: 550;
+  margin: 5px 0 4px;
+  overflow-wrap: anywhere;
+}
+.menu-project p {
+  color: var(--muted);
+  font-size: 11px;
+  margin: 3px 0 0;
+}
+.menu-tools {
+  display: grid;
+  gap: 3px;
+}
+.menu-tools button, .menu-solo {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 9px;
+  min-height: 39px;
+  padding: 7px 10px;
+  color: #dce3df;
+  text-align: left;
+  font-size: 14px;
+  background: transparent;
+  border-radius: 7px;
+}
+.menu-tools button svg {
+  width: 19px;
+  height: 19px;
+}
+.menu-tools button:hover, .menu-tools button[aria-expanded="true"], .menu-tools #camera-lock.active {
+  background: #bed5c71d;
+  color: #e3f0e8;
+}
+.menu-actions {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  grid-template-columns: 1fr 1fr;
+  gap: 3px;
+}
+.menu-actions button {
+  min-height: 40px;
+  gap: 7px;
+  padding: 6px;
+  font-size: 12px;
+}
+.menu-actions button svg { width: 17px; height: 17px; }
+.menu-solo {
+  width: 100%;
+  color: #ffe2a1;
+  background: #d6bd8016;
+  margin-top: 8px;
+}
+.menu-status {
+  margin-top: 8px;
+  border-top: 1px solid var(--border);
+  padding: 9px 5px 0;
+  font-size: 11px;
+  color: var(--muted);
+}
+#panel {
+  position: relative;
+  inset: auto;
+  width: clamp(260px, 30vw, 340px);
+  flex: 0 0 clamp(260px, 30vw, 340px);
+  max-height: none;
+  border: 0;
+  border-left: 1px solid #ffffff18;
+  border-radius: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+  background: #21272b;
+  min-width: 0;
+  min-height: 0;
+}
+#panel .panel-heading {
+  padding: 7px 13px;
+  min-height: 43px;
+  flex: 0 0 auto;
+}
+#panel-kicker { display: none; }
+#panel .panel-heading h2 {
+  margin: 0;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 550;
+  line-height: 1.3;
+}
+#panel .panel-heading .icon-button {
+  min-height: 32px;
+  width: 34px;
+}
+#panel .panel-body {
+  padding: 12px 14px;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+#panel[data-kind="surface"] .lighting-modes {
+  margin-bottom: 12px;
+  padding: 3px;
+}
+#panel[data-kind="surface"] .lighting-modes button {
+  min-height: 32px;
+}
+#panel[data-kind="surface"] .surface-controls {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 15px;
+}
+.surface-controls .surface-control {
+  min-width: 0;
+}
+.surface-controls .field-label {
+  font-size: 13px;
+  gap: 5px;
+  margin-bottom: 2px;
+}
+.surface-controls .bounce-control .field-label { color: #d9c6a2; }
+.surface-controls .surface-note { grid-column: 1 / -1; margin: 0; }
+.surface-controls .surface-reset {
+  grid-column: 1 / -1;
+  justify-self: end;
+  padding: 5px 10px;
+  min-height: 30px;
+  font-size: 11px;
+}
+.surface-reset svg { width: 15px; height: 15px; }
+body.aiming-light #menu-toggle { display: none; }
+#toast {
+  top: 12px;
+  bottom: auto;
+  z-index: 44;
+}
+body.panel-open #toast { top: 12px; }
+.loading { z-index: 60; }
+@media (max-width: 760px) and (orientation: portrait) {
+  #app { flex-direction: column; }
+  #panel {
+    width: 100%;
+    flex: 0 1 auto;
+    max-height: 46dvh;
+    border-left: none;
+    border-top: 1px solid #ffffff20;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  #panel[data-kind="surface"] { max-height: 36dvh; }
+  #panel .panel-heading { padding: 5px 12px; min-height: 38px; }
+  #panel .panel-body { padding: 8px 12px 10px; }
+  #panel[data-kind="surface"] .lighting-modes { margin-bottom: 8px; }
+  #panel[data-kind="surface"] .surface-controls {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px 14px;
+  }
+  .surface-controls input[type="range"] { height: 22px; }
+  .surface-controls .field-label { font-size: 12px; gap: 4px; margin-bottom: 2px; }
+  .surface-controls .surface-reset { min-height: 29px; }
+  #light-origin-status { top: calc(61px + env(safe-area-inset-top)); bottom: auto; }
+  body.aiming-light #toast { top: auto; bottom: calc(116px + env(safe-area-inset-bottom)); }
+}
+@media (max-height: 500px) and (orientation: landscape) {
+  #panel { width: min(290px, 41vw); flex-basis: min(290px, 41vw); }
+  #panel[data-kind="surface"] .surface-controls { gap: 8px; }
+}
