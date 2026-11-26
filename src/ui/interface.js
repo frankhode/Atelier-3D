@@ -1,4 +1,4 @@
-import { JOINTS, PRESETS, PUPPET_HEIGHT } from "../core/puppets.js";
+import { JOINTS, PRESETS, COMPOSITION_PRESETS, jointControls, PUPPET_HEIGHT } from "../core/puppets.js";
 import { SURFACE_GROUPS } from "../core/surfaces.js";
 import { icon, hydrateIcons } from "./icons.js";
 import { RATIOS } from "../core/defaults.js";
@@ -385,7 +385,7 @@ export class Interface {
     }
     if (el.dataset.poseField !== undefined) {
       this.actions.poseInput?.(el.dataset.poseField, el.value);
-      if (el.type === "range") el.closest("label")?.querySelector("output")?.replaceChildren(el.value + (el.dataset.poseField === "offset" ? " m" : "°"));
+      if (el.type === "range") el.closest(".field")?.querySelector("output")?.replaceChildren(el.value + (el.dataset.poseField === "offset" ? " m" : "°"));
       return;
     }
     const lightCard = el.closest(".light-card");
@@ -538,6 +538,7 @@ export class Interface {
       <summary>${icon("puppet")}<span class="model-name">${esc(m.name)}</span><span class="count">${(m.transform.scale*PUPPET_HEIGHT).toFixed(2)} m</span></summary><div class="model-content">
       <label class="field"><span class="field-label">Nombre</span><input type="text" data-path="${path}.name" maxlength="100" value="${esc(m.name)}" aria-label="Nombre de figura"></label>
       ${this.toggle(path+".visible","Visible")}${this.toggle(path+".magnet","Imán de superficie")}
+      <label class="field"><span class="field-label">Punto de apoyo</span><select data-path="${path}.support" aria-label="Punto de apoyo">${[["lowest","Punto más bajo (de pie / suelo)"],["pelvis","Pelvis (sentado)"],["torso","Torso (recostado)"]].map(([v,n])=>`<option value="${v}" ${(m.support??"lowest")===v?"selected":""}>${n}</option>`).join("")}</select></label>
       ${button("puppet-place","Ubicar sobre superficie",m,"primary full")}
       <div class="field"><span class="field-label">Altura nominal (m)</span><input type="number" data-puppet-height="${esc(m.id)}" aria-label="Altura de figura" min="0.25" max="5" step="0.01" value="${(m.transform.scale*PUPPET_HEIGHT).toFixed(2)}"></div>
       ${this.range(path+".transform.rotation.1","Giro horizontal",-180,180,1,"°")}
@@ -555,13 +556,24 @@ export class Interface {
     return `<div class="pose-toolbar"><button class="button primary" data-action="puppet-confirm">${e.original||this.state.models.some(m=>m.id===e.record.id)?"Aplicar pose":"Incorporar a la escena"}</button><button class="button" data-action="puppet-cancel">Cancelar</button></div>
     <p class="hint">${e.contextual?"Edición local: la cámara y la escena original quedan intactas.":"Taller independiente. Tocá una parte del maniquí o elegí una articulación."}</p>
     <div class="button-row pose-views">${[["front","Frente"],["left","Perfil"],["back","Dorso"],["three","3/4"]].map(([v,n])=>`<button class="button" data-action="puppet-view" data-value="${v}">${n}</button>`).join("")}</div>
-    <label class="field"><span class="field-label">Pose inicial</span><select data-pose-field="preset"><option value="">Elegí una pose…</option><optgroup label="Preestablecidas">${opts(PRESETS)}</optgroup>${this.state.poses.length?`<optgroup label="Mis poses">${this.state.poses.map((p,i)=>`<option value="saved:${i}">${esc(p.name)}</option>`).join("")}</optgroup>`:""}</select></label>
+    <label class="field"><span class="field-label">Pose inicial</span><select data-pose-field="preset"><option value="">Elegí una pose…</option><optgroup label="Preestablecidas">${opts(PRESETS)}</optgroup><optgroup label="Mi composición · los diez personajes">${COMPOSITION_PRESETS.map((p,i)=>`<option value="composition:${i}">${esc(p.name)}</option>`).join("")}</optgroup>${this.state.poses.length?`<optgroup label="Mis poses">${this.state.poses.map((p,i)=>`<option value="saved:${i}">${esc(p.name)}</option>`).join("")}</optgroup>`:""}</select></label>
     <label class="field"><span class="field-label">Articulación</span><select data-pose-field="joint" aria-label="Articulación">${JOINTS.map(([id,label])=>`<option value="${id}" ${id===joint?"selected":""}>${label}</option>`).join("")}</select></label>
-    <div class="pose-axes">${["Flexión (X)","Giro (Y)","Inclinación (Z)"].map((label,i)=>`<label class="field"><span class="field-label">${label}<output>${values[i]}°</output></span><input type="range" aria-label="${label}" data-pose-field="axis:${i}" min="-180" max="180" step="1" value="${values[i]}"></label>`).join("")}</div>
+    <div class="pose-axes">${jointControls(joint).map(c=>`<div class="field"><span class="field-label">${c.label}<output>${values[c.axis]*c.sign||0}°</output></span><div class="pose-adjust"><button type="button" class="button" aria-label="Reducir ${c.label} 5 grados" data-action="puppet-adjust" data-value="${c.axis}:-5">−</button><input type="range" aria-label="${c.label}" data-pose-field="axis:${c.axis}" min="${c.min}" max="${c.max}" step="1" value="${values[c.axis]*c.sign||0}"><button type="button" class="button" aria-label="Aumentar ${c.label} 5 grados" data-action="puppet-adjust" data-value="${c.axis}:5">+</button></div></div>`).join("")}</div>
     <button class="button full" data-action="puppet-reset-joint">Restablecer articulación</button>
     ${e.contextual?`<label class="field"><span class="field-label">Contexto cercano</span><select data-pose-field="radius"><option value="0.5" ${e.radius===.5?"selected":""}>0,5 m</option><option value="1" ${e.radius===1?"selected":""}>1 m</option><option value="2" ${e.radius===2?"selected":""}>2 m</option><option value="4" ${e.radius===4?"selected":""}>4 m</option></select></label>
     <label class="field"><span class="field-label">Ajuste vertical local<output>${(e.record.transform.position[1]-e.initialY).toFixed(2)} m</output></span><input type="range" aria-label="Ajuste vertical local" data-pose-field="offset" min="-0.5" max="0.5" step="0.005" value="${e.record.transform.position[1]-e.initialY}"></label>`:""}
     <details class="advanced"><summary>Guardar pose reutilizable</summary><label class="field"><span class="field-label">Nombre de pose</span><input type="text" maxlength="100" data-pose-field="name" value="${esc(e.nameDraft)}"></label><button class="button full" data-action="puppet-save-pose">Guardar en mis poses</button></details>`;
+  }
+
+  syncPoseControls(){
+    const e=this.actions.editor;
+    if(!e?.active)return;
+    for(const c of jointControls(e.joint)){
+      const input=this.body.querySelector(`[data-pose-field="axis:${c.axis}"]`);
+      if(!input)continue;
+      const value=e.record.pose[e.joint][c.axis]*c.sign||0;
+      input.value=value;input.closest(".field")?.querySelector("output")?.replaceChildren(value+"°");
+    }
   }
 
   camera() {

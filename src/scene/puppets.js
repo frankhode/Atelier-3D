@@ -1,9 +1,9 @@
 import * as THREE from "three";
-import { PUPPET_HEIGHT } from "../core/puppets.js";
+import { PUPPET_HEIGHT, jointRotationOrder } from "../core/puppets.js";
 
 // The sculptural pieces deliberately remain separate, like a wooden artist's
 // mannequin. Joint pivots are independent; there is no pedestal or skinning.
-export function buildPuppet(pose, material = new THREE.MeshStandardMaterial({color:0xb6b6b6,roughness:0.92})) {
+export function buildPuppet(pose, material = new THREE.MeshStandardMaterial({color:0xb6b6b6,roughness:0.92}), rotation=[0,0,0], rig) {
   const root=new THREE.Group(), joints=new Map();
   const sphere=new THREE.SphereGeometry(1,20,14);
   const segment=new THREE.CapsuleGeometry(1,1,6,16);
@@ -14,7 +14,7 @@ export function buildPuppet(pose, material = new THREE.MeshStandardMaterial({col
     parent.add(m); return m;
   };
   const joint=(parent,id,xyz,r=0.035)=>{
-    const g=new THREE.Group();g.name=id;g.position.set(...xyz);g.userData.joint=id;parent.add(g);joints.set(id,g);
+    const g=new THREE.Group();g.name=id;g.rotation.order=jointRotationOrder(id,rig);g.position.set(...xyz);g.userData.joint=id;parent.add(g);joints.set(id,g);
     if(r)shape(g,id+" · articulación",[0,0,0],[r,r,r]);
     return g;
   };
@@ -48,12 +48,14 @@ export function buildPuppet(pose, material = new THREE.MeshStandardMaterial({col
   root.updateMatrixWorld(true);
   const neutral=new THREE.Box3().setFromObject(root,true);
   const size=PUPPET_HEIGHT/(neutral.max.y-neutral.min.y);
-  const outer=new THREE.Group();root.scale.setScalar(size); root.position.y=-neutral.min.y*size;outer.add(root);
-  applyPuppetPose({joints},pose); outer.updateMatrixWorld(true);
-  return {root:outer,joints};
+  const outer=new THREE.Group(), attitude=new THREE.Group();root.scale.setScalar(size); root.position.y=-neutral.min.y*size;attitude.add(root);outer.add(attitude);
+  const puppet={root:outer,joints,attitude};
+  applyPuppetPose(puppet,pose,rotation);
+  return puppet;
 }
-export function applyPuppetPose(puppet,pose){
-  for(const [id,j] of puppet.joints)j.rotation.set(...pose[id].map(THREE.MathUtils.degToRad));
+export function applyPuppetPose(puppet,pose,rotation){
+  for(const [id,j] of puppet.joints)j.rotation.set(...pose[id].map(THREE.MathUtils.degToRad),j.rotation.order);
+  if(rotation&&puppet.attitude)puppet.attitude.rotation.set(...rotation.map(THREE.MathUtils.degToRad));
   puppet.root?.updateMatrixWorld(true);
 }
 export function applyFigureTransform(root,transform){
@@ -105,40 +107,53 @@ export function nearestSupport(models,x,z,nearY,excludeId){
   hits.sort((a,b)=>Math.abs(a.point.y-nearY)-Math.abs(b.point.y-nearY));
   return hits[0]?.point.clone()??null;
 }
-export function figureBase(wrapper){
-  return new THREE.Box3().setFromObject(wrapper,true).min.y;
-}
-export function figureContact(wrapper){
+function supportMeshes(wrapper,mode){
+  const list=[];
   wrapper.updateMatrixWorld(true);
-  const bottom=figureBase(wrapper), center=new THREE.Vector3(), v=new THREE.Vector3();
-  let count=0;
   wrapper.traverse(o=>{
     if(!o.isMesh||!o.visible)return;
+    if(mode==="pelvis" && o.name!=="Pelvis")return;
+    if(mode==="torso" && !["Pelvis","Abdomen","Tórax"].includes(o.name))return;
+    list.push(o);
+  });
+  return list;
+}
+export function figureBase(wrapper, mode="lowest"){
+  if(mode==="lowest")return new THREE.Box3().setFromObject(wrapper,true).min.y;
+  const meshes=supportMeshes(wrapper,mode),b=new THREE.Box3();
+  for(const mesh of meshes)b.expandByObject(mesh,true);
+  return b.isEmpty()?figureBase(wrapper):b.min.y;
+}
+export function figureContact(wrapper, mode="lowest"){
+  wrapper.updateMatrixWorld(true);
+  const bottom=figureBase(wrapper,mode), center=new THREE.Vector3(), v=new THREE.Vector3();
+  let count=0;
+  for(const o of supportMeshes(wrapper,mode)){
     const position=o.geometry.attributes.position;
     for(let i=0;i<position.count;i++){
       v.fromBufferAttribute(position,i).applyMatrix4(o.matrixWorld);
       if(v.y<=bottom+.008){center.add(v);count++;}
     }
-  });
+  }
   if(count)center.divideScalar(count);
   else center.copy(wrapper.position);
   center.y=bottom;
   return center;
 }
 export function snapFigure(entry,models,nearY){
-  const contact=figureContact(entry.wrapper);
+  const contact=figureContact(entry.wrapper,entry.record.support);
   const support=nearestSupport(models,contact.x,contact.z,nearY,entry.record.id);
   if(!support)return false;
   entry.record.transform.position[1]+=support.y-contact.y;
   applyFigureTransform(entry.wrapper,entry.record.transform);
   return true;
 }
-export function placeFigure(entry,point){
+export function placeFigure(entry,point,mode=entry.record.support){
   const {record,wrapper}=entry;
   record.transform.position[0]=point.x;
   record.transform.position[2]=point.z;
   applyFigureTransform(wrapper,record.transform);
-  const contact=figureContact(wrapper);
+  const contact=figureContact(wrapper,mode);
   for(const [i,axis] of ["x","y","z"].entries())record.transform.position[i]+=point[axis]-contact[axis];
   applyFigureTransform(wrapper,record.transform);
 }

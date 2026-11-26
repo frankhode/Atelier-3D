@@ -76,7 +76,7 @@ export class ModelManager {
     this.bounceStudy = new BounceStudy(state, this.material);
   }
   async parse(record) {
-    if (record.kind === "puppet") return buildPuppet(record.pose, this.material).root;
+    if (record.kind === "puppet") return buildPuppet(record.pose, this.material, record.poseRotation, record.poseRig).root;
     if (record.kind === "builtin") {
       if (!this.referenceText) {
         const response = await fetch(referenceURL);

@@ -402,3 +402,22 @@ test("the surface mode exposes four intensity controls and updates them independ
   assert.ok(f.document.querySelector('[data-action="pictorial-mode"][data-value="true"]'));
   await f.window.happyDOM.close();
 });
+
+
+test("pose workshop displays anatomical joint ranges and the ten composition presets", async ()=>{
+  const f=await fixture();
+  const {newPuppet}=await import("../src/core/puppets.js");
+  const editor={active:true,record:newPuppet("Prueba"),joint:"lKnee",contextual:false,nameDraft:""};
+  f.ui.actions.editor=editor;
+  f.ui.open("poseEditor");
+  let rows=[...f.document.querySelectorAll('.pose-axes input[type=range]')];
+  assert.equal(rows.length,1);assert.equal(rows[0].min,"0");assert.equal(rows[0].max,"145");
+  assert.equal(f.document.querySelectorAll('option[value^="composition:"]').length,10);
+  editor.joint="rElbow";f.ui.refresh();
+  rows=[...f.document.querySelectorAll('.pose-axes input[type=range]')];
+  assert.equal(rows.length,2);assert.equal(rows[0].max,"150");assert.equal(rows[0].min,"0");
+  assert.equal(f.document.querySelectorAll('[data-action="puppet-adjust"]').length,4);
+  editor.record.pose.rElbow[0]=-45;f.ui.syncPoseControls();
+  assert.equal(rows[0].value,"45");
+  await f.window.happyDOM.close();
+});

@@ -170,3 +170,11 @@ Al incorporar la pose queda congelada. Tocá una superficie horizontal visible p
 **Editar pose en contexto** encuadra independientemente la figura y recorta visualmente la escena alrededor de ella (0,5–4 m), conservando las luces y el mapa de rebotes de la sala. Cambiá articulaciones o ajustá la altura local; confirmar reemplaza solo la figura y cancelar descarta la pose provisional. En una escalera apoyá inicialmente un pie y acomodá el otro en contexto. Las figuras reciben y proyectan sombras directas; el mapa de rebotes se mantiene precalculado para la arquitectura, no se recalcula con figuras nuevas.
 
 Las figuras, poses reutilizables, escala, orientación e imán se conservan en el guardado local y en el JSON portable. Los JSON previos sin maniquíes siguen siendo compatibles.
+
+
+### Límites anatómicos y poses de composición
+Cada articulación tiene controles con nombres de movimientos, rangos conservadores y botones de ajuste de ±5°. La rodilla solo flexiona; el codo flexiona y permite rotación del antebrazo; hombros y caderas usan giro axial separado del movimiento de elevación. No se simula el contacto o la colisión entre extremidades. Los JSON anteriores mantienen la geometría hasta que se decide editar y confirmar una pose, momento en que el borrador se adapta a estas restricciones.
+
+Hay dos contrapostos (peso izquierdo/derecho) y un grupo **Mi composición · los diez personajes**, basado en el dibujo de referencia y las miradas acordadas. Son estudios editables, no una reconstrucción anatómica exacta de las zonas ocultas. Los niños parten de una estatura estimada, ajustable desde la escena; la pose recostada incluye orientación corporal horizontal sin modificar los ejes del objeto. La nueva orientación de pose y el sistema de articulaciones se guardan con la composición y las poses reutilizables.
+
+En Maniquíes, **Punto de apoyo** permite apoyar el punto más bajo, la pelvis o el torso. Las poses sentadas y recostadas usan el asiento y el respaldo horizontal como referencia sin que el pie o brazo colgante eleve toda la figura. Elegí de nuevo la superficie para aplicar el cambio.

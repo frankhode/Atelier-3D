@@ -1,4 +1,4 @@
-import { validatePose } from "./puppets.js";
+import { validatePose, constrainPose, ANATOMICAL_RIG } from "./puppets.js";
 import { validateSurfaces } from "./surfaces.js";
 import { validatePictorial } from "./pictorial.js";
 import {
@@ -140,7 +140,7 @@ export function validateProject(input) {
         name: text(m.name, "nombre de modelo"),
         kind: m.kind,
         source,
-        ...(m.kind === "puppet" ? { pose: validatePose(m.pose), magnet: bool(m.magnet, "imán") } : {}),
+        ...(m.kind === "puppet" ? { pose: validatePoseForRig(m.pose,m.poseRig), ...validatePoseRig(m.poseRig), ...validateSupport(m.support), ...(m.poseRotation !== undefined ? { poseRotation: vector(m.poseRotation, "orientación de pose", -180, 180) } : {}), magnet: bool(m.magnet, "imán") } : {}),
         visible: bool(m.visible, "visibilidad de modelo"),
         hidden: m.hidden.map((h) => text(h, "identificador de objeto", 1000)),
         transform: {
@@ -152,9 +152,27 @@ export function validateProject(input) {
     }),
   };
 }
+function validatePoseForRig(pose,rig) {
+  const v=validatePose(pose);
+  if(rig===ANATOMICAL_RIG){
+    const c=constrainPose(v);
+    if(Object.keys(v).some(id=>v[id].some((n,i)=>n!==c[id][i])))fail("límites anatómicos de pose");
+  }
+  return v;
+}
+function validateSupport(support) {
+  if(support===undefined)return {};
+  if(!["lowest","pelvis","torso"].includes(support))fail("tipo de apoyo");
+  return {support};
+}
+function validatePoseRig(rig) {
+  if(rig===undefined)return {};
+  if(rig!==ANATOMICAL_RIG)fail("sistema de articulaciones");
+  return {poseRig:rig};
+}
 function validateLibrary(poses = []) {
   if (!Array.isArray(poses) || poses.length > 100) fail("biblioteca de poses");
-  return poses.map(p => ({name: text(p?.name, "nombre de pose", 100), pose: validatePose(p?.pose)}));
+  return poses.map(p => ({name: text(p?.name, "nombre de pose", 100), pose: validatePoseForRig(p?.pose,p?.poseRig), ...validatePoseRig(p?.poseRig), ...validateSupport(p?.support), ...(p?.rotation !== undefined ? { rotation: vector(p.rotation, "orientación de pose", -180, 180) } : {})}));
 }
 export function serializeProject(project, portable = true) {
   const clean = validateProject(project);

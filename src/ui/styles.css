@@ -1581,3 +1581,9 @@ body.placing-figure #render-area canvas { cursor:crosshair; }
   .pose-toolbar .button { min-height:34px; }
   .pose-axes input[type=range] { height:24px; }
 }
+
+/* Anatomical controls use their own range; +/- makes fine touch adjustments
+   practical even when a slider spans a large motion. */
+.pose-adjust { display:flex; align-items:center; gap:8px; }
+.pose-adjust input[type=range] { flex:1; min-width:0; width:auto; margin:0; }
+.pose-adjust .button { width:36px; min-width:36px; padding:0; min-height:34px; font-size:18px; }

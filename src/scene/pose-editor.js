@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { buildPuppet, applyPuppetPose, applyFigureTransform, figureBase } from "./puppets.js";
-import { copyPose } from "../core/puppets.js";
+import { constrainPose, migrateLegacyPose, ANATOMICAL_RIG } from "../core/puppets.js";
 
 // One WebGL context. The workshop has an independent scene, while contextual
 // editing temporarily substitutes a draft in the real scene, keeping the
@@ -14,12 +14,12 @@ export class PoseEditor {
   }
   start(record, contextual=false){
     this.close();
-    this.record=structuredClone(record);this.contextual=contextual;this.radius=1;
+    this.record=structuredClone(record);this.record.pose=record.poseRig===ANATOMICAL_RIG?constrainPose(record.pose):migrateLegacyPose(record.pose);this.record.poseRig=ANATOMICAL_RIG;this.contextual=contextual;this.radius=1;
     this.joint="lShoulder";this.nameDraft="";
     this.original=contextual?this.models.entries.get(record.id):null;
     this.material=contextual && this.original ? this.original.objects[0].mesh.material :
       new THREE.MeshStandardMaterial({color:0xb9b9b9,roughness:.96});
-    this.preview=buildPuppet(this.record.pose,this.material);
+    this.preview=buildPuppet(this.record.pose,this.material,this.record.poseRotation,this.record.poseRig);
     applyFigureTransform(this.preview.root, contextual?this.record.transform:{position:[0,0,0],rotation:[0,0,0],scale:1});
     if(!contextual){
       this.preview.root.position.y-=figureBase(this.preview.root);
@@ -70,9 +70,10 @@ export class PoseEditor {
     this.camera.left=-h*aspect/2;this.camera.right=h*aspect/2;this.camera.top=h/2;this.camera.bottom=-h/2;
     this.camera.updateProjectionMatrix();
   }
-  changePose(pose){
-    this.record.pose=copyPose(pose);
-    applyPuppetPose(this.preview,this.record.pose);
+  changePose(pose, rotation){
+    this.record.pose=constrainPose(pose);
+    if(rotation)this.record.poseRotation=rotation.slice();
+    applyPuppetPose(this.preview,this.record.pose,this.record.poseRotation);
     if(!this.contextual){this.preview.root.position.y-=figureBase(this.preview.root);this.preview.root.updateMatrixWorld(true);}
     this.viewport.requestRender();
   }

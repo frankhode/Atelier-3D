@@ -16,7 +16,7 @@ import { aimLight, lightFromView } from "./scene/light-controls.js";
 import { setLightOrigin, presetOrigin } from "./scene/light-origins.js";
 import { angleForDiameter, BEAM_PRESETS } from "./core/light-beam.js";
 import { ModelManager, recordFromFile } from "./scene/models.js";
-import { JOINTS, PRESETS, PUPPET_HEIGHT, newPuppet, copyPose } from "./core/puppets.js";
+import { JOINTS, PRESETS, COMPOSITION_PRESETS, ANATOMICAL_RIG, migrateLegacyPose, jointControls, setJointControl, PUPPET_HEIGHT, newPuppet, copyPose } from "./core/puppets.js";
 import { PoseEditor } from "./scene/pose-editor.js";
 import { figureBase, nearestSupport, pickSupport, placeFigure, snapFigure } from "./scene/puppets.js";
 import { Vector2, Vector3 } from "three";
@@ -189,7 +189,7 @@ async function boot() {
       lighting.apply();
     if (path.startsWith("models.")) {
       const record = state.models[Number(path.split(".")[1])], entry=models.entries.get(record.id);
-      const oldBase = record.kind==="puppet"&&entry?figureBase(entry.wrapper):null;
+      const oldBase = record.kind==="puppet"&&entry?figureBase(entry.wrapper,record.support):null;
       models.apply(record.id);
       if(record.kind==="puppet" && entry && record.magnet && (path.endsWith(".magnet") ||
         (path.includes(".transform.")&&!path.endsWith(".position.1")))){
@@ -316,7 +316,7 @@ async function boot() {
     if(!editor.active)return;
     const draft=structuredClone(editor.record);
     const existing=state.models.find(m=>m.id===draft.id), contextual=editor.contextual;
-    const previousBase=existing?figureBase(models.entries.get(existing.id).wrapper):null;
+    const previousBase=existing?figureBase(models.entries.get(existing.id).wrapper,existing.support):null;
     if(!existing && state.models.length>=100){ui.notify("Máximo de 100 modelos por composición.");return;}
     if(!existing){
       const bounds=models.bounds();
@@ -335,7 +335,7 @@ async function boot() {
       models.mount(entry);
       if(!existing){
         const point=new Vector3(...draft.transform.position);
-        placeFigure(entry,point);
+        placeFigure(entry,point,"lowest");
       }else if(!contextual&&draft.magnet){
         const previous=models.entries.get(draft.id);
         snapFigure(previous,models,previousBase);
@@ -355,12 +355,21 @@ async function boot() {
       if(field==="name"){editor.nameDraft=value;return;}
       if(field==="joint"&&JOINTS.some(([id])=>id===value)){editor.joint=value;ui.refresh();viewport.requestRender();return;}
       if(field==="preset"&&value!==""){
-        const preset=value.startsWith("saved:")?state.poses[Number(value.slice(6))]:PRESETS[Number(value)];
-        if(preset){editor.changePose(preset.pose);ui.refresh();}return;
+        const preset=value.startsWith("saved:")?state.poses[Number(value.slice(6))]:value.startsWith("composition:")?COMPOSITION_PRESETS[Number(value.slice(12))]:PRESETS[Number(value)];
+        if(preset){
+          if(!state.models.some(m=>m.id===editor.record.id)){
+            editor.record.transform.scale=(preset.height??PUPPET_HEIGHT)/PUPPET_HEIGHT;
+            if(value.startsWith("composition:"))editor.record.name=preset.name;
+            else editor.record.name="Maniquí "+(state.models.filter(m=>m.kind==="puppet").length+1);
+          }
+          const pose=value.startsWith("saved:")&&preset.poseRig!==ANATOMICAL_RIG?migrateLegacyPose(preset.pose):preset.pose;
+          editor.record.support=preset.support??"lowest";
+          editor.changePose(pose,preset.rotation??[0,0,0]);editor.fit("front");ui.refresh();
+        }return;
       }
       if(field.startsWith("axis:")){
-        const axis=Number(field.slice(5)), pose=copyPose(editor.record.pose);
-        pose[editor.joint][axis]=Number(value);editor.changePose(pose);
+        const axis=Number(field.slice(5));
+        editor.changePose(setJointControl(editor.record.pose,editor.joint,axis,Number(value)));
       }else if(field==="radius"){editor.radius=Number(value);viewport.requestRender();}
       else if(field==="offset")editor.offset(Number(value));
     },
@@ -383,14 +392,23 @@ async function boot() {
       } else if (name === "puppet-confirm") {await confirmPose();}
       else if (name === "puppet-cancel") {closePose();ui.open("figures");}
       else if (name === "puppet-view" && editor.active) editor.fit(value);
+      else if(name==="puppet-adjust" && editor.active){
+        const [axis,delta]=String(value).split(":").map(Number);
+        const c=jointControls(editor.joint).find(c=>c.axis===axis);
+        if(c&&Number.isFinite(delta)){
+          editor.changePose(setJointControl(editor.record.pose,editor.joint,axis,editor.record.pose[editor.joint][axis]*c.sign+delta));
+          ui.syncPoseControls();
+        }
+      }
       else if (name === "puppet-reset-joint" && editor.active) {
-        const pose=copyPose(editor.record.pose);pose[editor.joint]=[0,0,0];editor.changePose(pose);ui.refresh();
+        const pose=copyPose(editor.record.pose);pose[editor.joint]=[0,0,0];editor.changePose(pose);ui.syncPoseControls();
       } else if (name === "puppet-save-pose" && editor.active) {
         const title=editor.nameDraft.trim();
         if(!title){ui.notify("Poné un nombre a la pose.");return;}
         const found=state.poses.find(p=>p.name===title);
         if(!found&&state.poses.length>=100){ui.notify("Máximo de 100 poses guardadas.");return;}
-        if(found)found.pose=copyPose(editor.record.pose);else state.poses.push({name:title,pose:copyPose(editor.record.pose)});
+        const saved={name:title,pose:copyPose(editor.record.pose),poseRig:ANATOMICAL_RIG,support:editor.record.support??"lowest",rotation:(editor.record.poseRotation??[0,0,0]).slice()};
+        if(found)Object.assign(found,saved);else state.poses.push(saved);
         editor.nameDraft="";ui.refresh();changed();ui.notify("Pose guardada en la biblioteca.");
       } else if (name === "puppet-place" && model?.kind==="puppet") startPlacement(id);
       else if (name === "puppet-context" && model?.kind==="puppet") startPose(model,true);
@@ -403,14 +421,14 @@ async function boot() {
         ui.selectedFigure=id;ui.refresh();
       } else if (name === "puppet-snap" && model?.kind==="puppet") {
         const entry=models.entries.get(id);
-        if(!snapFigure(entry,models,figureBase(entry.wrapper)))ui.notify("No se encontró apoyo debajo de la figura.");
+        if(!snapFigure(entry,models,figureBase(entry.wrapper,model.support)))ui.notify("No se encontró apoyo debajo de la figura.");
         models.apply(id);ui.selectedFigure=id;ui.refresh();changed();
       } else if (name === "puppet-duplicate" && model?.kind==="puppet") {
         if(state.models.length>=100){ui.notify("Máximo de 100 modelos por composición.");return;}
         await withBusy(async()=>{
           const copy={...structuredClone(model),id:newPuppet("").id,name:(model.name+" · copia").slice(0,100)};
           const entry=await models.prepare(copy);
-          const oldBase=figureBase(models.entries.get(id).wrapper);
+          const oldBase=figureBase(models.entries.get(id).wrapper,model.support);
           copy.transform.position[0]+=.45;
           state.models.push(copy);models.mount(entry);
           if(copy.magnet)snapFigure(entry,models,oldBase);
