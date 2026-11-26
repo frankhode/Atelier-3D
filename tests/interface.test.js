@@ -366,3 +366,23 @@ test("3D guides show source and direction, explicitly identify an offscreen orig
   assert.equal(f.document.querySelector("#light-origin-status").hidden, true);
   await f.window.happyDOM.close();
 });
+
+
+test("the surface mode exposes only three intensity controls and updates them independently", async () => {
+  const f = await fixture();
+  f.state.surfaces.enabled = true;
+  f.ui.open("lights");
+  assert.equal(f.document.querySelector("#panel-title").textContent, "Paredes luminosas");
+  assert.equal(f.document.querySelectorAll('input[type="range"]').length, 3);
+  const left = f.document.querySelector('[data-path="surfaces.left"]');
+  left.value = "0.45";
+  left.dispatchEvent(new f.window.Event("input", {bubbles: true}));
+  assert.equal(f.state.surfaces.left, 0.45);
+  assert.equal(f.state.surfaces.upper, 1);
+  assert.equal(f.state.surfaces.front, 0.08);
+  assert.ok(f.calls.includes("surfaces.left"));
+  assert.equal(f.document.querySelector('[data-output="surfaces.left"]').textContent,"45%");
+  assert.ok(f.document.querySelector('[data-action="surface-mode"].active'));
+  assert.ok(f.document.querySelector('[data-action="pictorial-mode"][data-value="true"]'));
+  await f.window.happyDOM.close();
+});

@@ -1,3 +1,4 @@
+import { validateSurfaces } from "./surfaces.js";
 import { validatePictorial } from "./pictorial.js";
 import {
   APP_FORMAT,
@@ -63,6 +64,8 @@ export function validateProject(input) {
     fail("cámara degenerada");
   if (!Object.hasOwn(RATIOS, f.ratio)) fail("proporción");
   if (!["balanced", "high"].includes(a.quality)) fail("calidad");
+  const pictorial = validatePictorial(input.pictorial), surfaces = validateSurfaces(input.surfaces);
+  if (pictorial.enabled && surfaces.enabled) fail("modos de iluminación simultáneos");
   const ids = new Set();
   return {
     format: APP_FORMAT,
@@ -87,7 +90,8 @@ export function validateProject(input) {
       helpers: bool(a.helpers, "guías"),
       quality: a.quality,
     },
-    pictorial: validatePictorial(input.pictorial),
+    pictorial,
+    surfaces,
     lights: input.lights.map((l) => {
       if (!l) fail("luz");
       const pos = vector(l.position, "posición de luz"),
@@ -153,3 +157,4 @@ export function serializeProject(project, portable = true) {
     });
   return JSON.stringify(clean, null, portable ? 2 : 0);
 }
+

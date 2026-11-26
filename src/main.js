@@ -1,3 +1,4 @@
+import { defaultSurfaces, surfaceDemoProject } from "./core/surfaces.js";
 import { defaultPictorial, pictorialDemoProject } from "./core/pictorial.js";
 import "./ui/styles.css";
 import { defaultProject, MAX_PROJECT_BYTES } from "./core/defaults.js";
@@ -18,10 +19,12 @@ import { ModelManager, recordFromFile } from "./scene/models.js";
 import { Interface } from "./ui/interface.js";
 
 const pictorialDemo = new URLSearchParams(location.search).get("pictorico") === "1";
-const activeStorageKey = pictorialDemo ? "atelier3d:pictorial-study:v1" : STORAGE_KEY;
+const surfaceDemo = !pictorialDemo && new URLSearchParams(location.search).get("superficies") === "1";
+const activeStorageKey = pictorialDemo ? "atelier3d:pictorial-study:v1" : surfaceDemo ? "atelier3d:surface-study:v1" : STORAGE_KEY;
+const newProject = () => pictorialDemo ? pictorialDemoProject(defaultProject()) : surfaceDemo ? surfaceDemoProject(defaultProject()) : defaultProject();
 async function boot() {
   const local = readLocal(undefined, activeStorageKey);
-  const state = local.project || (pictorialDemo ? pictorialDemoProject(defaultProject()) : defaultProject());
+  const state = local.project || newProject();
   let pickingPictorial = false;
   let ui,
     saveTimer,
@@ -81,7 +84,7 @@ async function boot() {
   });
   function updateTargetMarker() {
     if (!ui) return;
-    if (state.pictorial?.enabled) { ui.hideLightTarget(); return; }
+    if (state.pictorial?.enabled || state.surfaces?.enabled) { ui.hideLightTarget(); return; }
     const index =
       ui.activePanel === "lights" ? ui.selectedLight : targetPreview?.index;
     if (index === undefined || index === null || !state.lights[index]) {
@@ -156,9 +159,9 @@ async function boot() {
   }
   function apply(path) {
     validateProject(state);
-    if (path.startsWith("pictorial.")) {
+    if (path.startsWith("pictorial.") || path.startsWith("surfaces.")) {
       models.applyLook(); lighting.apply();
-      if (path === "pictorial.enabled") ui.refresh();
+      if (path === "pictorial.enabled" || path === "surfaces.enabled") ui.refresh();
     }
     if (path.startsWith("camera.")) {
       rig.restore();
@@ -168,8 +171,10 @@ async function boot() {
       ui.selectedLight = Number(path.split(".")[1]);
     if (path.startsWith("lights.") || path.startsWith("appearance."))
       lighting.apply();
-    if (path.startsWith("models."))
+    if (path.startsWith("models.")) {
       models.apply(state.models[Number(path.split(".")[1])].id);
+      lighting.apply();
+    }
     if (path.startsWith("appearance.")) {
       models.material.color.set(state.appearance.material);
       viewport.applyAppearance();
@@ -248,9 +253,13 @@ async function boot() {
     action: async (name, value, id) => {
       const model = state.models.find((m) => m.id === id);
       if (name === "pictorial-mode") {
-        state.pictorial.enabled = value === "true"; lighting.setSolo(null); ui.setSoloLight(null); apply("pictorial.enabled");
+        state.surfaces.enabled = false; state.pictorial.enabled = value === "true"; lighting.setSolo(null); ui.setSoloLight(null); apply("pictorial.enabled");
+      } else if (name === "surface-mode") {
+        state.pictorial.enabled = false; state.surfaces.enabled = true; lighting.setSolo(null); ui.setSoloLight(null); hideTargetMarker(); apply("surfaces.enabled");
+      } else if (name === "surface-reset") {
+        state.surfaces = { ...defaultSurfaces(), enabled: true }; apply("surfaces.enabled");
       } else if (name === "pictorial-preset") {
-        state.pictorial = { ...defaultPictorial(), enabled: true }; apply("pictorial.enabled"); ui.notify("Mancha sobre fondo y escalera. Ajustá los valores de la izquierda y el piso.");
+        state.surfaces.enabled = false; state.pictorial = { ...defaultPictorial(), enabled: true }; apply("pictorial.enabled"); ui.notify("Mancha sobre fondo y escalera. Ajustá los valores de la izquierda y el piso.");
       } else if (name === "pictorial-view") {
         if (state.camera.locked) { ui.notify("Desbloqueá la cámara para usar la vista frontal."); return; }
         const demo=pictorialDemoProject(defaultProject()); state.camera=demo.camera; state.frame=demo.frame; rig.restore(); viewport.resize(); changed();
@@ -391,7 +400,7 @@ async function boot() {
             "¿Restablecer la sala de prueba? Exportá antes un JSON si querés conservar esta composición.",
           )
         )
-          await withBusy(() => replaceProject(pictorialDemo ? pictorialDemoProject(defaultProject()) : defaultProject()));
+          await withBusy(() => replaceProject(newProject()));
       } else if (name === "png") {
         viewport.render(rig.camera);
         viewport.renderer.domElement.toBlob((blob) => {
@@ -419,6 +428,7 @@ async function boot() {
         else if (name === "up-y") model.transform.rotation[0] = 0;
         else if (name === "up-z") model.transform.rotation[0] = -90;
         models.apply(id);
+        lighting.apply();
         ui.refresh();
         changed();
       }
@@ -551,3 +561,4 @@ boot().catch((error) => {
   };
   loading.append(p, help, retry, reset);
 });
+

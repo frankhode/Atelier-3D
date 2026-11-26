@@ -515,6 +515,8 @@ select {
   padding: 4px;
   margin-bottom: 20px;
 }
+.segmented.lighting-modes { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.segmented.lighting-modes button { font-size: 12px; padding-inline: 2px; }
 .segmented button,
 .preset-grid button {
   min-height: 40px;
@@ -1330,3 +1332,4 @@ body.aiming-light .view-tools {
 .pictorial-zone { border-top: 1px solid var(--border); padding-top: 16px; margin-top: 16px; }
 .pictorial-zone .field { margin-bottom: 4px; }
 .pictorial-zone .toggle-row { color: var(--muted); font-size: 13px; }
+

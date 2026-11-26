@@ -1,3 +1,4 @@
+import { SURFACE_GROUPS } from "../core/surfaces.js";
 import { icon, hydrateIcons } from "./icons.js";
 import { RATIOS } from "../core/defaults.js";
 import { ORIGIN_PRESETS, planPointFromClient } from "../scene/light-origins.js";
@@ -208,7 +209,7 @@ export class Interface {
     if (!this.activePanel) return;
     const [kicker, title] = labels[this.activePanel];
     document.getElementById("panel-kicker").textContent = kicker;
-    document.getElementById("panel-title").textContent = this.activePanel === "lights" && this.state.pictorial?.enabled ? "Estudio pictórico" : title;
+    document.getElementById("panel-title").textContent = this.activePanel === "lights" && this.state.pictorial?.enabled ? "Estudio pictórico" : this.activePanel === "lights" && this.state.surfaces?.enabled ? "Paredes luminosas" : title;
     this.body.innerHTML = this[this.activePanel]();
     this.body.scrollTop = 0;
     this.actions.panelChanged?.(this.activePanel);
@@ -222,7 +223,7 @@ export class Interface {
         ? "8,20 × 6,50 × 5,60 m · Sala de referencia"
         : `${this.state.models.length} modelos en la composición`;
     document.getElementById("projection-label").textContent =
-      (c.projection === "perspective" ? "Perspectiva" : "Ortogonal") + (this.state.pictorial?.enabled ? " · Pictórico" : "");
+      (c.projection === "perspective" ? "Perspectiva" : "Ortogonal") + (this.state.pictorial?.enabled ? " · Pictórico" : this.state.surfaces?.enabled ? " · Superficies" : "");
     const lock = document.getElementById("camera-lock");
     lock.innerHTML = icon(c.locked ? "lock" : "unlock");
     lock.classList.toggle("active", c.locked);
@@ -371,7 +372,7 @@ export class Interface {
     if (
       !el.dataset.path ||
       (el.type === "number" && el.value === "") ||
-      (el.type !== "checkbox" && !el.checkValidity())
+      (!["checkbox", "range"].includes(el.type) && !el.checkValidity())
     )
       return;
     // Selects/checkboxes emit both input and change: process once per value.
@@ -490,6 +491,7 @@ export class Interface {
   }
   lights() {
     if (this.state.pictorial?.enabled) return this.pictorialPanel();
+    if (this.state.surfaces?.enabled) return this.surfacePanel();
     return this.lightingModes() + `<p class="hint">Primero ubicá el origen; después elegí el destino. La línea señala la dirección; los muros pueden bloquear la luz.</p>${this.state.lights
       .map(
         (
@@ -535,8 +537,18 @@ export class Interface {
       )}<div class="section">${this.range("appearance.ambient", "Luz ambiente", 0, 1, 0.01)}${this.range("appearance.exposure", "Exposición", 0.1, 4, 0.05)}${this.toggle("appearance.helpers", "Mostrar guías de luces y ejes")}</div><button class="button full" data-action="reset-lights">${icon("reset")}Restablecer iluminación</button><p class="hint">La luz ambiente aclara las sombras sin rebotes físicos. Para estudiar contrastes profundos, reducí su intensidad.</p>`;
   }
   lightingModes() {
-    const active=!!this.state.pictorial?.enabled;
-    return '<div class="segmented" aria-label="Modo de iluminación"><button data-action="pictorial-mode" data-value="false" class="'+(!active?'active':'')+'">Focos</button><button data-action="pictorial-mode" data-value="true" class="'+(active?'active':'')+'">Pictórico</button></div>';
+    const pictorial = !!this.state.pictorial?.enabled, surfaces = !!this.state.surfaces?.enabled;
+    return `<div class="segmented lighting-modes" aria-label="Modo de iluminación">
+      <button data-action="pictorial-mode" data-value="false" class="${!pictorial && !surfaces ? "active" : ""}">Focos</button>
+      <button data-action="surface-mode" class="${surfaces ? "active" : ""}">Superficies</button>
+      <button data-action="pictorial-mode" data-value="true" class="${pictorial ? "active" : ""}">Pictórico</button>
+    </div>`;
+  }
+  surfacePanel() {
+    return this.lightingModes() +
+      '<p class="hint">Superficies emisoras invisibles, con posición fija. Las aberturas y los objetos interceptan la luz.</p>' +
+      SURFACE_GROUPS.map(({key,label}) => '<section class="section">' + this.pictRange('surfaces.'+key,label,0,2,.01) + '</section>').join('') +
+      '<button class="button full" data-action="surface-reset">' + icon("reset") + 'Restablecer intensidades</button><p class="hint">0% apaga el grupo. Los focos y la luz ambiente no intervienen en este modo.</p>';
   }
   pictRange(path,label,min=0,max=1,step=.01,suffix='%',scale=100) {
     const value=get(this.state,path),shown=Math.round(value*scale*100)/100;
@@ -603,3 +615,4 @@ export class Interface {
     el.classList.toggle("error", error);
   }
 }
+

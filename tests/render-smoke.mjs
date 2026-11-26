@@ -3,7 +3,7 @@ import {spawn} from 'node:child_process';
 import {mkdir} from 'node:fs/promises';
 import {chromium} from 'playwright';
 
-const server=spawn('npm',['run','preview','--','--port','4179'],{stdio:['ignore','pipe','pipe'],detached:process.platform!=='win32'});
+const server=spawn('npm',['run','preview','--','--host','127.0.0.1','--port','4179'],{stdio:['ignore','pipe','pipe'],detached:process.platform!=='win32'});
 let browser;let output='';const errors=[];
 server.stdout.on('data',v=>output+=v);server.stderr.on('data',v=>output+=v);
 const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
@@ -71,6 +71,46 @@ try {
  await page.locator('#close-panel').click();
  await page.setViewportSize({width:390,height:780});await delay(250);
  await page.screenshot({path:'artifacts/pictorial-mobile.png'});
+ // Verify the new surface mode against the actual framebuffer, not only light uniforms.
+ await page.setViewportSize({width:1000,height:800});
+ await page.goto('http://127.0.0.1:4179/?superficies=1');
+ await page.locator('#loading').waitFor({state:'hidden',timeout:30000});
+ await page.locator('[data-panel="lights"]').click();
+ assert.equal(await page.locator('#panel-title').textContent(),'Paredes luminosas');
+ assert.equal(await page.locator('input[type="range"]').count(),3);
+ const setSurface=async(key,value)=>{
+   await page.locator('[data-path="surfaces.'+key+'"]').evaluate((el,value)=>{el.value=String(value);el.dispatchEvent(new Event('input',{bubbles:true}));},value);
+ };
+ const mean=()=>page.evaluate(()=>{
+   const f=window.__studyFrame;if(!f)return -1;
+   let sum=0,count=0;
+   for(let y=Math.round(f.height*.34);y<f.height*.72;y+=5)for(let x=Math.round(f.width*.26);x<f.width*.74;x+=5){const at=4*(y*f.width+x);sum+=(f.pixels[at]+f.pixels[at+1]+f.pixels[at+2])/3;count++;}
+   return sum/count;
+ });
+ async function freshFrame(action){
+   const seq=await page.evaluate(()=>window.__studyFrame?.sequence||0);
+   await action();
+   await page.waitForFunction(seq=>window.__studyFrame?.sequence>seq,seq,{timeout:20000});
+ }
+ await freshFrame(async()=>{await setSurface('left',0);await setSurface('front',0);});
+ const surfaceMain=await mean();
+ await page.locator('#close-panel').click();
+ await page.screenshot({path:'artifacts/surface-main.png'});
+ await page.locator('[data-panel="lights"]').click();
+ await freshFrame(()=>setSurface('upper',0));
+ const surfaceDark=await mean();
+ await freshFrame(()=>setSurface('front',0.4));
+ const surfaceFill=await mean();
+ console.log('Actual WebGL surface luminances:',{surfaceMain,surfaceDark,surfaceFill});
+ assert.ok(surfaceMain>surfaceDark+25,'The upper walls must visibly illuminate the room through the opening.');
+ assert.ok(surfaceFill>surfaceDark+20,'A secondary area source must illuminate the room independently.');
+ assert.ok(surfaceDark<5,'Zero intensities must leave the room in darkness.');
+ await page.locator('[data-action="surface-reset"]').click();
+ await page.waitForFunction(()=>{const saved=JSON.parse(localStorage.getItem('atelier3d:surface-study:v1')||'null');return saved?.surfaces?.enabled&&saved.surfaces.upper===1&&saved.surfaces.front===.08;},undefined,{timeout:5000});
+ assert.equal(await page.evaluate(()=>localStorage.getItem('atelier3d:composition:v1')),'physical-composition-untouched');
+ await page.setViewportSize({width:390,height:780});await delay(350);
+ await page.screenshot({path:'artifacts/surface-mobile.png'});
  assert.deepEqual(errors,[],'The scene must compile its shaders and run without browser errors');
  console.log('WebGL render checks passed, including distinct plane values and a responsive painterly control.');
 } catch(error) { console.error('Browser diagnostics:',errors.map(message=>message.slice(0,1800))); throw error; } finally {await browser?.close();if(process.platform==='win32'){server.kill('SIGTERM');server.stdout.destroy();server.stderr.destroy();}else{try{process.kill(-server.pid,'SIGTERM');}catch(error){if(error.code!=='ESRCH')throw error;}}}
+

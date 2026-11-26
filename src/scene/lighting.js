@@ -1,9 +1,11 @@
 import * as THREE from "three";
+import { SurfaceLighting } from "./surface-lighting.js";
 export class Lighting {
   constructor(scene, state) {
     this.scene = scene;
     this.state = state;
     this.soloIndex = null;
+    this.surfaces = new SurfaceLighting(scene, state);
     this.ambient = new THREE.AmbientLight(0xffffff, 0.12);
     scene.add(this.ambient);
     this.lights = state.lights.map(() => {
@@ -39,12 +41,12 @@ export class Lighting {
   }
   apply() {
     this.ambient.intensity =
-      this.soloIndex === null && !this.state.pictorial?.enabled ? this.state.appearance.ambient : 0;
+      this.soloIndex === null && !this.state.pictorial?.enabled && !this.state.surfaces?.enabled ? this.state.appearance.ambient : 0;
     const mapSize = this.state.appearance.quality === "high" ? 2048 : 1024;
     this.lights.forEach((light, i) => {
       const s = this.state.lights[i];
       light.visible =
-        s.enabled && !this.state.pictorial?.enabled && (this.soloIndex === null || this.soloIndex === i);
+        s.enabled && !this.state.pictorial?.enabled && !this.state.surfaces?.enabled && (this.soloIndex === null || this.soloIndex === i);
       light.intensity = s.intensity;
       light.position.fromArray(s.position);
       light.target.position.fromArray(s.target);
@@ -61,6 +63,8 @@ export class Lighting {
       this.helpers[i].visible = this.state.appearance.helpers && light.visible;
       this.helpers[i].update();
     });
+    this.surfaces.apply();
     this.axes.visible = this.grid.visible = this.state.appearance.helpers;
   }
 }
+

@@ -1,3 +1,4 @@
+import { defaultSurfaces } from "./surfaces.js";
 import { defaultPictorial } from "./pictorial.js";
 export const APP_FORMAT = "atelier-3d";
 export const SCHEMA_VERSION = 1;
@@ -37,6 +38,7 @@ export function defaultProject() {
       quality: "balanced",
     },
     pictorial: defaultPictorial(),
+    surfaces: defaultSurfaces(),
     lights: [
       {
         name: "Principal · abertura superior",
@@ -82,3 +84,4 @@ export function defaultProject() {
     ],
   };
 }
+

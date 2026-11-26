@@ -129,3 +129,15 @@ npm install --no-save --package-lock=false playwright@1.56.1
 npx playwright install --with-deps chromium
 npm run test:render
 ```
+
+
+## Prueba de paredes luminosas
+
+Abrir [el estudio de superficies](https://frankhode.github.io/Atelier-3D/?superficies=1), con guardado separado de la composición habitual y del estudio pictórico. En cualquier proyecto también se puede elegir **Luces → Superficies**; al cambiar de modo no se pierden las configuraciones de los otros dos.
+
+Tres intensidades independientes (0–200%, 0% = apagado):
+- **Planta alta**: dos paredes del ambiente superior, cerca de la abertura de la escalera.
+- **Exterior izquierdo**: detrás de la puerta ventana.
+- **Exterior frontal**: fuera del encuadre, hacia las figuras.
+
+Las posiciones están fijadas a la sala de referencia; no hay que ajustar origen, dirección o apertura. Ocho emisores discretos con sombras, repartidos por las superficies, aproximan una fuente extensa sin renderizar un panel visible. La geometría sigue interceptando la luz. No es iluminación global ni una integración continua de toda la superficie: pueden resultar transiciones de sombra escalonadas. Focos y ambiente se desactivan temporalmente en este modo. Sus valores permanecen guardados y el JSON conserva también las intensidades del nuevo modo.
