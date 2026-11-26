@@ -71,6 +71,7 @@ export function defaultProject() {
         shadows: true,
       },
     ],
+    poses: [],
     models: [
       {
         id: "sala-v04",

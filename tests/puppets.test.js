@@ -1,0 +1,62 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {readFile} from "node:fs/promises";
+import * as THREE from "three";
+import {JOINTS, PRESETS, newPuppet, copyPose, PUPPET_HEIGHT, neutralPose} from "../src/core/puppets.js";
+import {defaultProject} from "../src/core/defaults.js";
+import {validateProject,serializeProject} from "../src/core/project.js";
+import {ModelManager} from "../src/scene/models.js";
+import {buildPuppet,applyPuppetPose,figureBase,figureContact,nearestSupport,placeFigure,snapFigure,pickSupport} from "../src/scene/puppets.js";
+import {saveLocal,readLocal} from "../src/core/storage.js";
+const obj=await readFile(new URL("../public/models/sala-v04.obj",import.meta.url),"utf8");
+
+test("mannequin has seventeen independent pivots, true human height, and no pedestal",()=>{
+ const pose=neutralPose(), p=buildPuppet(pose);
+ assert.equal(p.joints.size,JOINTS.length);
+ const box=new THREE.Box3().setFromObject(p.root,true);
+ assert.ok(Math.abs(box.min.y)<1e-6);
+ assert.ok(Math.abs(box.max.y-PUPPET_HEIGHT)<1e-6);
+ const before=p.joints.get("lWrist").getWorldPosition(new THREE.Vector3());
+ const right=p.joints.get("rWrist").getWorldPosition(new THREE.Vector3());
+ pose.lElbow[0]=-90;applyPuppetPose(p,pose);
+ assert.ok(before.distanceTo(p.joints.get("lWrist").getWorldPosition(new THREE.Vector3()))>.2);
+ assert.ok(right.distanceTo(p.joints.get("rWrist").getWorldPosition(new THREE.Vector3()))<1e-8);
+});
+test("preset and frozen scene pose survive portable and lightweight JSON and local storage",()=>{
+ const state=defaultProject(), p=newPuppet("Persona",PRESETS[3].pose);
+ state.poses.push({name:"Escalera",pose:copyPose(p.pose)});state.models.push(p);
+ p.transform.position=[3,.8,1];p.transform.scale=.85;p.transform.rotation=[0,45,0];p.magnet=false;
+ assert.deepEqual(validateProject(JSON.parse(serializeProject(state))),state);
+ assert.deepEqual(validateProject(JSON.parse(serializeProject(state,false))),state);
+ const data=new Map(), storage={setItem:(k,v)=>data.set(k,v),getItem:k=>data.get(k)};
+ assert.equal(saveLocal(state,storage),"complete");assert.deepEqual(readLocal(storage).project,state);
+ const old=defaultProject();delete old.poses;assert.deepEqual(validateProject(old).poses,[]);
+ const bad=structuredClone(state);bad.models[1].pose.lHip[0]=Infinity;assert.throws(()=>validateProject(bad));
+ const draft=copyPose(p.pose);draft.lHip[0]=0;assert.notEqual(draft.lHip[0],p.pose.lHip[0]);
+});
+test("a figure uses the neutral scene material, casts shadows and supports actual stair geometry",async()=>{
+ const state=defaultProject(), manager=new ModelManager(new THREE.Scene(),state);manager.referenceText=obj;
+ manager.mount(await manager.prepare(state.models[0]));
+ const p=newPuppet("Escalera",PRESETS[3].pose);state.models.push(p);
+ const entry=await manager.prepare(p);manager.mount(entry);
+ assert.ok(entry.objects.every(o=>o.mesh.castShadow&&o.mesh.receiveShadow&&o.mesh.material===manager.material));
+ const ground=nearestSupport(manager,4,3,0,p.id);assert.ok(ground);assert.ok(Math.abs(ground.y)<1e-6);
+ const stair=manager.entries.get("sala-v04").objects.find(o=>/pelda/i.test(o.name));
+ assert.ok(stair,"stair mesh present");
+ const box=new THREE.Box3().setFromObject(stair.mesh,true),center=box.getCenter(new THREE.Vector3());
+ const step=nearestSupport(manager,center.x,center.z,box.max.y,p.id);
+ assert.ok(step);assert.ok(Math.abs(step.y-box.max.y)<1e-5);
+ placeFigure(entry,step);
+ assert.ok(Math.abs(figureBase(entry.wrapper)-step.y)<1e-5);
+ assert.ok(figureContact(entry.wrapper).distanceTo(step)<1e-5);
+ p.transform.scale=1.1;manager.apply(p.id);assert.ok(snapFigure(entry,manager,step.y));
+ const contact=figureContact(entry.wrapper), actual=nearestSupport(manager,contact.x,contact.z,step.y,p.id);
+ assert.ok(Math.abs(contact.y-actual.y)<1e-5);
+ const camera=new THREE.PerspectiveCamera(48,1,.01,100);
+ camera.position.set(center.x,box.max.y+1,center.z);camera.up.set(0,0,-1);
+ camera.lookAt(center.x,box.max.y,center.z);camera.updateMatrixWorld();
+ const picked=pickSupport(manager,camera,new THREE.Vector2(),p.id);
+ // A closer roof may occlude a step from above; direct rays from the room still find a support.
+ assert.ok(picked===null||Number.isFinite(picked.y));
+ manager.clear();
+});

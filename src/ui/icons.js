@@ -1,4 +1,5 @@
 const paths = {
+  puppet: '<circle cx="12" cy="4" r="2"/><path d="M12 6v8m-6-4 6-3 6 3m-6 4-4 7m4-7 4 7"/>',
   menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
   fullscreen: '<path d="M9 3H3v6m12-6h6v6M3 15v6h6m12-6v6h-6"/>',
   minimize: '<path d="M3 9h6V3m12 6h-6V3M3 15h6v6m12-6h-6v6"/>',

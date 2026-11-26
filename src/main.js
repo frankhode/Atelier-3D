@@ -16,6 +16,10 @@ import { aimLight, lightFromView } from "./scene/light-controls.js";
 import { setLightOrigin, presetOrigin } from "./scene/light-origins.js";
 import { angleForDiameter, BEAM_PRESETS } from "./core/light-beam.js";
 import { ModelManager, recordFromFile } from "./scene/models.js";
+import { JOINTS, PRESETS, PUPPET_HEIGHT, newPuppet, copyPose } from "./core/puppets.js";
+import { PoseEditor } from "./scene/pose-editor.js";
+import { figureBase, nearestSupport, pickSupport, placeFigure, snapFigure } from "./scene/puppets.js";
+import { Vector2, Vector3 } from "three";
 import { Interface } from "./ui/interface.js";
 
 const pictorialDemo = new URLSearchParams(location.search).get("pictorico") === "1";
@@ -39,9 +43,11 @@ async function boot() {
   const rig = new CameraRig(viewport.renderer.domElement, state, () =>
     changed(),
   );
-  viewport.onResize = (aspect) => rig.resize(aspect);
+  const editor = new PoseEditor(viewport,rig,models,()=>{ui.refresh();viewport.requestRender();});
+  let placing = null, placementGesture = null;
+  viewport.onResize = (aspect) => {rig.resize(aspect);editor.resize(aspect);};
   viewport.onRender = () => {
-    viewport.render(rig.camera);
+    if(editor.active)editor.render();else viewport.render(rig.camera);
     updateTargetMarker();
   };
   const aimer = new LightAimer(viewport.renderer.domElement, rig, models, {
@@ -85,6 +91,7 @@ async function boot() {
   });
   function updateTargetMarker() {
     if (!ui) return;
+    if(editor.active||placing){ui.hideLightTarget();return;}
     if (state.pictorial?.enabled || state.surfaces?.enabled) { ui.hideLightTarget(); return; }
     const index =
       ui.activePanel === "lights" ? ui.selectedLight : targetPreview?.index;
@@ -181,7 +188,13 @@ async function boot() {
     if (path.startsWith("lights.") || path.startsWith("appearance."))
       lighting.apply();
     if (path.startsWith("models.")) {
-      models.apply(state.models[Number(path.split(".")[1])].id);
+      const record = state.models[Number(path.split(".")[1])], entry=models.entries.get(record.id);
+      const oldBase = record.kind==="puppet"&&entry?figureBase(entry.wrapper):null;
+      models.apply(record.id);
+      if(record.kind==="puppet" && entry && record.magnet && (path.endsWith(".magnet") ||
+        (path.includes(".transform.")&&!path.endsWith(".position.1")))){
+        if(!snapFigure(entry,models,oldBase))ui.notify("No se encontró una superficie de apoyo en esa ubicación.");
+      }
       lighting.apply();
       void ensureBounces();
     }
@@ -195,6 +208,7 @@ async function boot() {
   }
   async function replaceProject(next) {
     // Parse all geometry before touching the active scene: failed imports are atomic.
+    finishPlacement(false);closePose();
     const staged = await models.prepareProject(next);
     models.clear();
     Object.assign(state, next);
@@ -210,7 +224,7 @@ async function boot() {
     ui.refresh();
     changed();
     const pending = state.models.filter(
-      (m) => m.kind !== "builtin" && !m.source,
+      (m) => ["obj","glb"].includes(m.kind) && !m.source,
     );
     if (pending.length)
       ui.notify(
@@ -252,7 +266,104 @@ async function boot() {
     rig.restore();
     changed();
   }
+  function finishPlacement(reopen=true){
+    if(!placing)return;
+    placing=null;placementGesture=null;
+    document.body.classList.remove("placing-figure");
+    document.getElementById("figure-aim-bar").hidden=true;
+    rig.controls.enabled=!state.camera.locked;
+    if(reopen)ui.open("figures");
+    viewport.requestRender();
+  }
+  function startPlacement(id){
+    if(!models.entries.has(id))return;
+    aimer.cancel();hideTargetMarker();
+    ui.selectedFigure=id;ui.open(null);placing=id;
+    rig.controls.enabled=false;
+    document.body.classList.add("placing-figure");
+    document.getElementById("figure-aim-bar").hidden=false;
+    viewport.requestRender();
+  }
+  const canvas=viewport.renderer.domElement;
+  canvas.addEventListener("pointerdown",e=>{
+    if(!placing)return;
+    if(e.button===0&&e.isPrimary)placementGesture={x:e.clientX,y:e.clientY,id:e.pointerId};
+    else placementGesture=null;
+  });
+  canvas.addEventListener("pointercancel",()=>placementGesture=null);
+  canvas.addEventListener("pointerup",e=>{
+    if(!placing)return;
+    const g=placementGesture;placementGesture=null;
+    if(!g||g.id!==e.pointerId||Math.hypot(e.clientX-g.x,e.clientY-g.y)>8)return;
+    const r=canvas.getBoundingClientRect(), ndc=new Vector2((e.clientX-r.left)/r.width*2-1,1-(e.clientY-r.top)/r.height*2);
+    const point=pickSupport(models,rig.camera,ndc,placing);
+    if(!point){ui.notify("Tocá una superficie horizontal visible (piso, escalón o asiento).");return;}
+    const entry=models.entries.get(placing);
+    placeFigure(entry,point);models.apply(placing);finishPlacement();changed();
+  });
+  document.getElementById("cancel-figure-aim").onclick=()=>finishPlacement();
+  document.addEventListener("keydown",e=>{if(e.key==="Escape"&&placing)finishPlacement();});
+  function startPose(record,contextual){
+    finishPlacement(false);aimer.cancel();hideTargetMarker();
+    editor.start(record,contextual);
+    viewport.freeFrame=true;
+    ui.open("poseEditor");viewport.resize();
+  }
+  function closePose(){
+    editor.close();viewport.freeFrame=false;
+  }
+  async function confirmPose(){
+    if(!editor.active)return;
+    const draft=structuredClone(editor.record);
+    const existing=state.models.find(m=>m.id===draft.id), contextual=editor.contextual;
+    const previousBase=existing?figureBase(models.entries.get(existing.id).wrapper):null;
+    if(!existing && state.models.length>=100){ui.notify("Máximo de 100 modelos por composición.");return;}
+    if(!existing){
+      const bounds=models.bounds();
+      const center=bounds.isEmpty()?new Vector3():bounds.getCenter(new Vector3());
+      const room=state.models.find(m=>m.kind==="builtin"&&m.visible);
+      if(room){
+        center.set(4.1,0,3.25).applyMatrix4(models.entries.get(room.id).wrapper.matrixWorld);
+      }else center.y=bounds.isEmpty()?0:bounds.min.y;
+      const support=nearestSupport(models,center.x,center.z,center.y,draft.id);
+      draft.transform.position=(support||center).toArray();
+    }
+    await withBusy(async()=>{
+      const entry=await models.prepare(draft);
+      if(existing){models.remove(existing.id);state.models[state.models.indexOf(existing)]=draft;}
+      else state.models.push(draft);
+      models.mount(entry);
+      if(!existing){
+        const point=new Vector3(...draft.transform.position);
+        placeFigure(entry,point);
+      }else if(!contextual&&draft.magnet){
+        const previous=models.entries.get(draft.id);
+        snapFigure(previous,models,previousBase);
+      }
+      ui.selectedFigure=draft.id;
+      closePose();
+      ui.open("figures");changed();
+      if(!existing)startPlacement(draft.id);
+      else ui.notify("Pose aplicada. La figura vuelve a estar congelada.");
+    });
+  }
   const actions = {
+    editor,
+    closePose,
+    poseInput(field,value){
+      if(!editor.active)return;
+      if(field==="name"){editor.nameDraft=value;return;}
+      if(field==="joint"&&JOINTS.some(([id])=>id===value)){editor.joint=value;ui.refresh();viewport.requestRender();return;}
+      if(field==="preset"&&value!==""){
+        const preset=value.startsWith("saved:")?state.poses[Number(value.slice(6))]:PRESETS[Number(value)];
+        if(preset){editor.changePose(preset.pose);ui.refresh();}return;
+      }
+      if(field.startsWith("axis:")){
+        const axis=Number(field.slice(5)), pose=copyPose(editor.record.pose);
+        pose[editor.joint][axis]=Number(value);editor.changePose(pose);
+      }else if(field==="radius"){editor.radius=Number(value);viewport.requestRender();}
+      else if(field==="offset")editor.offset(Number(value));
+    },
     changed,
     apply,
     panelChanged: () => viewport.resize(),
@@ -265,7 +376,47 @@ async function boot() {
     },
     action: async (name, value, id) => {
       const model = state.models.find((m) => m.id === id);
-      if (name === "pictorial-mode") {
+      if (name === "puppet-new") {
+        if(state.models.length>=100){ui.notify("Máximo de 100 modelos por composición.");return;}
+        const n=state.models.filter(m=>m.kind==="puppet").length+1;
+        startPose(newPuppet("Maniquí "+n),false);
+      } else if (name === "puppet-confirm") {await confirmPose();}
+      else if (name === "puppet-cancel") {closePose();ui.open("figures");}
+      else if (name === "puppet-view" && editor.active) editor.fit(value);
+      else if (name === "puppet-reset-joint" && editor.active) {
+        const pose=copyPose(editor.record.pose);pose[editor.joint]=[0,0,0];editor.changePose(pose);ui.refresh();
+      } else if (name === "puppet-save-pose" && editor.active) {
+        const title=editor.nameDraft.trim();
+        if(!title){ui.notify("Poné un nombre a la pose.");return;}
+        const found=state.poses.find(p=>p.name===title);
+        if(!found&&state.poses.length>=100){ui.notify("Máximo de 100 poses guardadas.");return;}
+        if(found)found.pose=copyPose(editor.record.pose);else state.poses.push({name:title,pose:copyPose(editor.record.pose)});
+        editor.nameDraft="";ui.refresh();changed();ui.notify("Pose guardada en la biblioteca.");
+      } else if (name === "puppet-place" && model?.kind==="puppet") startPlacement(id);
+      else if (name === "puppet-context" && model?.kind==="puppet") startPose(model,true);
+      else if (name === "puppet-workshop" && model?.kind==="puppet") startPose(model,false);
+      else if (name === "puppet-height" && model?.kind==="puppet") {
+        const height=Number(value);
+        if(!Number.isFinite(height)||height<.25||height>5)return;
+        model.transform.scale=height/PUPPET_HEIGHT;
+        apply("models."+state.models.indexOf(model)+".transform.scale");
+        ui.selectedFigure=id;ui.refresh();
+      } else if (name === "puppet-snap" && model?.kind==="puppet") {
+        const entry=models.entries.get(id);
+        if(!snapFigure(entry,models,figureBase(entry.wrapper)))ui.notify("No se encontró apoyo debajo de la figura.");
+        models.apply(id);ui.selectedFigure=id;ui.refresh();changed();
+      } else if (name === "puppet-duplicate" && model?.kind==="puppet") {
+        if(state.models.length>=100){ui.notify("Máximo de 100 modelos por composición.");return;}
+        await withBusy(async()=>{
+          const copy={...structuredClone(model),id:newPuppet("").id,name:(model.name+" · copia").slice(0,100)};
+          const entry=await models.prepare(copy);
+          const oldBase=figureBase(models.entries.get(id).wrapper);
+          copy.transform.position[0]+=.45;
+          state.models.push(copy);models.mount(entry);
+          if(copy.magnet)snapFigure(entry,models,oldBase);
+          ui.selectedFigure=copy.id;ui.refresh();changed();
+        });
+      } else if (name === "pictorial-mode") {
         state.surfaces.enabled = false; state.pictorial.enabled = value === "true"; lighting.setSolo(null); ui.setSoloLight(null); apply("pictorial.enabled");
       } else if (name === "surface-mode") {
         state.pictorial.enabled = false; state.surfaces.enabled = true; lighting.setSolo(null); ui.setSoloLight(null); hideTargetMarker(); apply("surfaces.enabled");
@@ -502,7 +653,7 @@ async function boot() {
       });
     });
   viewport.onContextLost = () => {
-    aimer.cancel();
+    aimer.cancel();finishPlacement(false);
     hideTargetMarker();
     ui.notify(
       "Se interrumpió la vista 3D. Esperando que el navegador recupere el contexto…",
@@ -532,7 +683,7 @@ async function boot() {
         9000,
       );
     const missing = state.models.filter(
-      (m) => m.kind !== "builtin" && !m.source,
+      (m) => ["obj","glb"].includes(m.kind) && !m.source,
     );
     if (missing.length)
       ui.notify(

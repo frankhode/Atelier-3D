@@ -1,3 +1,4 @@
+import { validatePose } from "./puppets.js";
 import { validateSurfaces } from "./surfaces.js";
 import { validatePictorial } from "./pictorial.js";
 import {
@@ -109,15 +110,16 @@ export function validateProject(input) {
         shadows: bool(l.shadows, "sombras"),
       };
     }),
+    poses: validateLibrary(input.poses),
     models: input.models.map((m) => {
-      if (!m || !["builtin", "obj", "glb"].includes(m.kind) || !m.transform)
+      if (!m || !["builtin", "obj", "glb", "puppet"].includes(m.kind) || !m.transform)
         fail("modelo");
       const id = text(m.id, "identificador", 100);
       if (!id || ids.has(id) || (m.kind === "builtin" && id !== "sala-v04"))
         fail("identificador de modelo");
       ids.add(id);
       let source = null;
-      if (m.kind !== "builtin" && m.source != null) {
+      if (["obj","glb"].includes(m.kind) && m.source != null) {
         source = text(
           m.source,
           "contenido de modelo",
@@ -138,6 +140,7 @@ export function validateProject(input) {
         name: text(m.name, "nombre de modelo"),
         kind: m.kind,
         source,
+        ...(m.kind === "puppet" ? { pose: validatePose(m.pose), magnet: bool(m.magnet, "imán") } : {}),
         visible: bool(m.visible, "visibilidad de modelo"),
         hidden: m.hidden.map((h) => text(h, "identificador de objeto", 1000)),
         transform: {
@@ -149,11 +152,15 @@ export function validateProject(input) {
     }),
   };
 }
+function validateLibrary(poses = []) {
+  if (!Array.isArray(poses) || poses.length > 100) fail("biblioteca de poses");
+  return poses.map(p => ({name: text(p?.name, "nombre de pose", 100), pose: validatePose(p?.pose)}));
+}
 export function serializeProject(project, portable = true) {
   const clean = validateProject(project);
   if (!portable)
     clean.models.forEach((m) => {
-      if (m.kind !== "builtin") m.source = null;
+      if (["obj", "glb"].includes(m.kind)) m.source = null;
     });
   return JSON.stringify(clean, null, portable ? 2 : 0);
 }

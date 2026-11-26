@@ -34,6 +34,7 @@
         </div>
         <div class="menu-tools">
           <button data-panel="objects" aria-expanded="false"><span data-icon="objects"></span><span>Objetos</span></button>
+          <button data-panel="figures" aria-expanded="false"><span data-icon="puppet"></span><span>Maniquíes</span></button>
           <button data-panel="camera" aria-expanded="false"><span data-icon="camera"></span><span>Cámara</span></button>
           <button data-panel="lights" aria-expanded="false"><span data-icon="sun"></span><span>Luces</span></button>
           <button data-panel="frame" aria-expanded="false"><span data-icon="frame"></span><span>Encuadre</span></button>
@@ -70,6 +71,10 @@
         </div>
         <div id="panel-body" class="panel-body"></div>
       </aside>
+      <div id="figure-aim-bar" class="light-aim-bar" hidden>
+        <div role="status"><strong>Ubicar maniquí</strong><span>Tocá el piso, un peldaño o un asiento.</span></div>
+        <button id="cancel-figure-aim" class="button">Cancelar</button>
+      </div>
       <div id="light-aim-bar" class="light-aim-bar" hidden>
         <div role="status">
           <strong id="light-aim-name"></strong
@@ -139,6 +144,7 @@
             <dd>
               Bloqueá la cámara desde el menú general o desde Cámara. Volvé a desbloquearla para navegar.
             </dd>
+            <dt>Maniquíes</dt><dd>Armá una pose desde Maniquíes → Nuevo. Incorporala a la sala, tocá una superficie de apoyo o ajustá su ubicación. Editar en contexto abre un estudio local con su propia cámara.</dd>
             <dt>Área de trabajo</dt>
             <dd>Todas las herramientas están en el menú ☰. Los paneles reservan su propio espacio sin cubrir la escena; cerralos para recuperar toda la pantalla. Si el navegador lo admite, elegí Pantalla completa.</dd>
             <dt>Guardar y compartir</dt>

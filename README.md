@@ -159,3 +159,14 @@ El mapa contiene la firma de las fuentes y de la geometría original para detect
 El visor ocupa toda el área disponible. **☰** abre el menú general (Objetos, Cámara, Luces, Encuadre, Archivo, importación, bloqueo, encuadre, ayuda y pantalla completa cuando el navegador la admite). No hay barras ni títulos superpuestos de forma permanente.
 
 Los controles se abren en un panel lateral en escritorio y horizontal en el teléfono en orientación vertical, reservando espacio propio sin cubrir la escena. En **Superficies**, las cuatro intensidades aparecen en una grilla compacta en móvil. El visor sigue siendo navegable mientras el editor está abierto; cerrarlo recupera toda la pantalla sin cambiar los parámetros de cámara ni de iluminación.
+
+
+## Maniquíes articulados
+
+Desde el menú general ☰ → **Maniquíes** se puede abrir un taller de poses independiente. El modelo neutro sin pedestal tiene 17 articulaciones, cinco poses preestablecidas y una biblioteca de poses propia de la composición. Los ejes locales X/Y/Z se editan con deslizadores; también se puede seleccionar una pieza del cuerpo tocándola. Frente, perfil, dorso y 3/4 no alteran la cámara de la composición.
+
+Al incorporar la pose queda congelada. Tocá una superficie horizontal visible para colocar el punto de apoyo más bajo sobre esa geometría. La altura se expresa como estatura nominal de pie (1,75 m por defecto). El imán ajusta el apoyo al cambiar posición horizontal, escala o rotación y se puede desactivar. El ajuste fino de Y permite corregir contactos manualmente. El imán no simula equilibrio, colisiones ni cinemática inversa.
+
+**Editar pose en contexto** encuadra independientemente la figura y recorta visualmente la escena alrededor de ella (0,5–4 m), conservando las luces y el mapa de rebotes de la sala. Cambiá articulaciones o ajustá la altura local; confirmar reemplaza solo la figura y cancelar descarta la pose provisional. En una escalera apoyá inicialmente un pie y acomodá el otro en contexto. Las figuras reciben y proyectan sombras directas; el mapa de rebotes se mantiene precalculado para la arquitectura, no se recalcula con figuras nuevas.
+
+Las figuras, poses reutilizables, escala, orientación e imán se conservan en el guardado local y en el JSON portable. Los JSON previos sin maniquíes siguen siendo compatibles.

@@ -1,3 +1,4 @@
+import { JOINTS, PRESETS, PUPPET_HEIGHT } from "../core/puppets.js";
 import { SURFACE_GROUPS } from "../core/surfaces.js";
 import { icon, hydrateIcons } from "./icons.js";
 import { RATIOS } from "../core/defaults.js";
@@ -27,6 +28,8 @@ const lightName = (light) =>
   })[light.name] || light.name;
 const labels = {
   objects: ["ESCENA", "Objetos"],
+  figures: ["COMPOSICIÓN", "Maniquíes"],
+  poseEditor: ["TALLER", "Editar pose"],
   camera: ["PUNTO DE VISTA", "Cámara"],
   lights: ["CLAROSCURO", "Iluminación"],
   frame: ["COMPOSICIÓN", "Encuadre"],
@@ -100,6 +103,7 @@ export class Interface {
     });
     this.body.addEventListener("input", (e) => this.handleInput(e));
     this.body.addEventListener("change", (e) => {
+      if (e.target.dataset.puppetHeight !== undefined) {this.handleInput(e);return;}
       if (e.target.dataset.beamWidth !== undefined) {
         this.handleInput(e);
         return;
@@ -228,7 +232,9 @@ export class Interface {
   }
   open(name) {
     this.setMenu(false);
+    if (this.activePanel === "poseEditor" && name !== "poseEditor") this.actions.closePose?.();
     this.activePanel = name;
+    document.body.classList.toggle("posing", name === "poseEditor");
     this.panel.hidden = !name;
     this.panel.dataset.kind = name || "";
     document.body.classList.toggle("panel-open", !!name);
@@ -273,6 +279,7 @@ export class Interface {
     lock.title = c.locked ? "Desbloquear cámara" : "Bloquear cámara";
     document.getElementById("fit-camera").disabled = c.locked;
     // Keep coordinates in step with navigation without replacing focused controls.
+    if (this.activePanel === "figures") this.body.querySelectorAll('input[data-path$=".transform.position.1"]').forEach(input=>{if(document.activeElement!==input)input.value=Number(get(this.state,input.dataset.path).toFixed(3));});
     if (this.activePanel === "camera")
       this.body
         .querySelectorAll(
@@ -372,6 +379,15 @@ export class Interface {
   }
   handleInput(event) {
     const el = event.target;
+    if (el.dataset.puppetHeight !== undefined) {
+      if(event.type==="change"&&el.value!==""&&el.checkValidity())this.actions.action("puppet-height",el.value,el.dataset.puppetHeight);
+      return;
+    }
+    if (el.dataset.poseField !== undefined) {
+      this.actions.poseInput?.(el.dataset.poseField, el.value);
+      if (el.type === "range") el.closest("label")?.querySelector("output")?.replaceChildren(el.value + (el.dataset.poseField === "offset" ? " m" : "°"));
+      return;
+    }
     const lightCard = el.closest(".light-card");
     if (lightCard && this.selectedLight !== Number(lightCard.dataset.light)) {
       this.selectedLight = Number(lightCard.dataset.light);
@@ -437,6 +453,7 @@ export class Interface {
       (o) => o.dataset.output === path,
     );
     if (output) output.textContent = `${Math.round(value * Number(output.dataset.scale || 1) * 100) / 100}${output.dataset.suffix}`;
+    if(path.endsWith(".name")&&this.activePanel==="figures")el.closest(".model-card")?.querySelector(".model-name")?.replaceChildren(value);
     if (path.startsWith("lights.")) this.syncLightLabels();
     this.update();
   }
@@ -502,6 +519,7 @@ export class Interface {
   objects() {
     return `<div class="section"><button class="button full" data-action="import">${icon("plus")}Importar OBJ / GLB</button><p class="hint">Mostrá u ocultá cada pieza. Los modelos se agregan sin invertir sus ejes.</p></div><input class="object-filter" type="text" placeholder="Buscar un objeto…" aria-label="Buscar un objeto" data-filter>${this.state.models
       .map((m, i) => {
+        if (m.kind === "puppet") return "";
         const entry = this.models.entries.get(m.id),
           count = entry?.objects.length || 0;
         return `<details class="model-card" ${i === 0 ? "open" : ""}><summary>${icon("objects")}<span class="model-name">${esc(m.name)}</span><span class="count">${count}</span></summary><div class="model-content">${this.toggle(`models.${i}.visible`, "Modelo visible")}<div class="model-actions"><button class="button" data-action="fit-model" data-id="${esc(m.id)}">${icon("fit")}Encuadrar</button>${m.kind !== "builtin" ? `<button class="icon-button" aria-label="Quitar ${esc(m.name)}" data-action="remove" data-id="${esc(m.id)}">${icon("trash")}</button>` : ""}</div>${!entry ? '<p class="hint">Modelo pendiente: volvé a importar el archivo original para recuperar su geometría.</p>' : ""}<details class="advanced"><summary>Posición, unidades y orientación</summary>${this.triple(`models.${i}.transform.position`, "Posición (m)")}${this.triple(`models.${i}.transform.rotation`, "Rotación (°)")}<label class="field"><span class="field-label">Escala uniforme</span><input type="number" aria-label="Escala uniforme" data-path="models.${i}.transform.scale" value="${m.transform.scale}" min="0.000001" max="10000" step="0.001"></label><div class="button-row"><button class="button" data-action="units-m" data-id="${m.id}">m</button><button class="button" data-action="units-cm" data-id="${m.id}">cm</button><button class="button" data-action="units-mm" data-id="${m.id}">mm</button></div><div class="button-row"><button class="button" data-action="up-y" data-id="${m.id}">Y arriba</button><button class="button" data-action="up-z" data-id="${m.id}">Z arriba</button></div><p class="hint">La escala convierte unidades a metros. Z arriba rota −90° sobre X, sin reflexión.</p></details><div class="button-row"><button class="button" data-action="show-all" data-id="${m.id}">Mostrar piezas</button><button class="button" data-action="hide-all" data-id="${m.id}">Ocultar piezas</button></div>${(entry?.objects || []).map((o) => `<label class="object-row"><span title="${esc(o.name)}">${esc(o.name.replaceAll("_", " "))}</span><input type="checkbox" aria-label="Mostrar ${esc(o.name)}" data-object="${o.key}" data-model="${m.id}" ${!m.hidden.includes(o.key) ? "checked" : ""}></label>`).join("")}</div></details>`;
@@ -510,6 +528,42 @@ export class Interface {
         "",
       )}<p class="hint">${this.models.entries.size} modelos · ${[...this.models.entries.values()].reduce((n, e) => n + e.objects.length, 0)} piezas</p>`;
   }
+
+  figures() {
+    const figures = this.state.models.map((m,i)=>({m,i})).filter(({m})=>m.kind==="puppet");
+    const button=(action,label,m,extra="")=>`<button class="button ${extra}" data-action="${action}" data-id="${esc(m.id)}">${label}</button>`;
+    return `<div class="section"><button class="button primary full" data-action="puppet-new">${icon("plus")}Nuevo maniquí</button><p class="hint">Armá la pose aparte y congelala al incorporarla a la escena.</p></div>${figures.map(({m,i})=>{
+      const path=`models.${i}`;
+      return `<details class="model-card" ${(this.selectedFigure===m.id||(!this.selectedFigure&&i===figures[0].i))?"open":""}>
+      <summary>${icon("puppet")}<span class="model-name">${esc(m.name)}</span><span class="count">${(m.transform.scale*PUPPET_HEIGHT).toFixed(2)} m</span></summary><div class="model-content">
+      <label class="field"><span class="field-label">Nombre</span><input type="text" data-path="${path}.name" maxlength="100" value="${esc(m.name)}" aria-label="Nombre de figura"></label>
+      ${this.toggle(path+".visible","Visible")}${this.toggle(path+".magnet","Imán de superficie")}
+      ${button("puppet-place","Ubicar sobre superficie",m,"primary full")}
+      <div class="field"><span class="field-label">Altura nominal (m)</span><input type="number" data-puppet-height="${esc(m.id)}" aria-label="Altura de figura" min="0.25" max="5" step="0.01" value="${(m.transform.scale*PUPPET_HEIGHT).toFixed(2)}"></div>
+      ${this.range(path+".transform.rotation.1","Giro horizontal",-180,180,1,"°")}
+      <details class="advanced"><summary>Posición y rotación fina</summary>${this.triple(path+".transform.position","Posición (m)")}${this.triple(path+".transform.rotation","Rotación (°)")}</details>
+      ${button("puppet-context","Editar pose en contexto",m,"full")}${button("puppet-workshop","Editar pose en taller",m,"full")}
+      <div class="button-row">${button("puppet-snap","Reapoyar",m)}${button("puppet-duplicate","Duplicar",m)}${button("remove","Quitar",m)}</div></div></details>`;
+    }).join("") || '<p class="hint">Todavía no hay maniquíes en esta composición.</p>'}
+    <p class="hint">${figures.length} figuras · ${this.state.poses.length} poses guardadas. Se incluyen en el JSON.</p>`;
+  }
+  poseEditor() {
+    const e=this.actions.editor;
+    if(!e?.active)return "";
+    const pose=e.record.pose, joint=e.joint, values=pose[joint];
+    const opts=(list)=>list.map((p,i)=>`<option value="${i}">${esc(p.name)}</option>`).join("");
+    return `<div class="pose-toolbar"><button class="button primary" data-action="puppet-confirm">${e.original||this.state.models.some(m=>m.id===e.record.id)?"Aplicar pose":"Incorporar a la escena"}</button><button class="button" data-action="puppet-cancel">Cancelar</button></div>
+    <p class="hint">${e.contextual?"Edición local: la cámara y la escena original quedan intactas.":"Taller independiente. Tocá una parte del maniquí o elegí una articulación."}</p>
+    <div class="button-row pose-views">${[["front","Frente"],["left","Perfil"],["back","Dorso"],["three","3/4"]].map(([v,n])=>`<button class="button" data-action="puppet-view" data-value="${v}">${n}</button>`).join("")}</div>
+    <label class="field"><span class="field-label">Pose inicial</span><select data-pose-field="preset"><option value="">Elegí una pose…</option><optgroup label="Preestablecidas">${opts(PRESETS)}</optgroup>${this.state.poses.length?`<optgroup label="Mis poses">${this.state.poses.map((p,i)=>`<option value="saved:${i}">${esc(p.name)}</option>`).join("")}</optgroup>`:""}</select></label>
+    <label class="field"><span class="field-label">Articulación</span><select data-pose-field="joint" aria-label="Articulación">${JOINTS.map(([id,label])=>`<option value="${id}" ${id===joint?"selected":""}>${label}</option>`).join("")}</select></label>
+    <div class="pose-axes">${["Flexión (X)","Giro (Y)","Inclinación (Z)"].map((label,i)=>`<label class="field"><span class="field-label">${label}<output>${values[i]}°</output></span><input type="range" aria-label="${label}" data-pose-field="axis:${i}" min="-180" max="180" step="1" value="${values[i]}"></label>`).join("")}</div>
+    <button class="button full" data-action="puppet-reset-joint">Restablecer articulación</button>
+    ${e.contextual?`<label class="field"><span class="field-label">Contexto cercano</span><select data-pose-field="radius"><option value="0.5" ${e.radius===.5?"selected":""}>0,5 m</option><option value="1" ${e.radius===1?"selected":""}>1 m</option><option value="2" ${e.radius===2?"selected":""}>2 m</option><option value="4" ${e.radius===4?"selected":""}>4 m</option></select></label>
+    <label class="field"><span class="field-label">Ajuste vertical local<output>${(e.record.transform.position[1]-e.initialY).toFixed(2)} m</output></span><input type="range" aria-label="Ajuste vertical local" data-pose-field="offset" min="-0.5" max="0.5" step="0.005" value="${e.record.transform.position[1]-e.initialY}"></label>`:""}
+    <details class="advanced"><summary>Guardar pose reutilizable</summary><label class="field"><span class="field-label">Nombre de pose</span><input type="text" maxlength="100" data-pose-field="name" value="${esc(e.nameDraft)}"></label><button class="button full" data-action="puppet-save-pose">Guardar en mis poses</button></details>`;
+  }
+
   camera() {
     const c = this.state.camera;
     return `${this.toggle("camera.locked", "Bloquear cámara")}<p class="hint">El candado conserva la posición, el objetivo y la óptica de la cámara.</p><fieldset ${c.locked ? "disabled" : ""}><div class="segmented"><button data-action="projection" data-value="perspective" class="${c.projection === "perspective" ? "active" : ""}">Perspectiva</button><button data-action="projection" data-value="orthographic" class="${c.projection === "orthographic" ? "active" : ""}">Ortogonal</button></div><h3 class="section-title">Vistas ortogonales</h3><div class="preset-grid">${[

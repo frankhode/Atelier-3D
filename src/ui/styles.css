@@ -1565,3 +1565,19 @@ body.panel-open #toast { top: 12px; }
   #panel { width: min(290px, 41vw); flex-basis: min(290px, 41vw); }
   #panel[data-kind="surface"] .surface-controls { gap: 8px; }
 }
+
+/* The pose editor is a separate working mode, with the same docked controls. */
+body.posing #menu-toggle, body.placing-figure #menu-toggle { display:none; }
+body.placing-figure #render-area canvas { cursor:crosshair; }
+#figure-aim-bar { z-index:46; }
+.pose-toolbar { display:flex; gap:6px; position:sticky;top:0;background:#21272b;padding:4px 0 7px;z-index:2; }
+.pose-toolbar .primary { flex:1; }
+.pose-views { flex-wrap:wrap; }
+.pose-views .button { flex:1; padding:5px; }
+.pose-axes .field { margin-bottom:8px; }
+#panel[data-kind="figures"] .model-content .button.full { margin-bottom:5px; }
+@media (max-width:760px) and (orientation:portrait){
+  #panel[data-kind="poseEditor"] { max-height:48dvh; }
+  .pose-toolbar .button { min-height:34px; }
+  .pose-axes input[type=range] { height:24px; }
+}

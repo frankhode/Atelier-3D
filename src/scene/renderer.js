@@ -42,7 +42,7 @@ export class Viewport {
     const frame = fitFrame(
       bounds.width,
       bounds.height,
-      RATIOS[this.state.frame.ratio],
+      this.freeFrame ? null : RATIOS[this.state.frame.ratio],
     );
     this.width = Math.max(1, Math.round(frame.width));
     this.height = Math.max(1, Math.round(frame.height));
@@ -51,8 +51,8 @@ export class Viewport {
     const guides = document.getElementById("frame-guides");
     guides.style.width = `${this.width}px`;
     guides.style.height = `${this.height}px`;
-    guides.classList.toggle("thirds", this.state.frame.thirds);
-    guides.classList.toggle("framed", this.state.frame.ratio !== "free");
+    guides.classList.toggle("thirds", !this.freeFrame && this.state.frame.thirds);
+    guides.classList.toggle("framed", !this.freeFrame && this.state.frame.ratio !== "free");
     this.renderer.setSize(this.width, this.height);
     this.onResize(this.width / this.height);
     this.requestRender();
