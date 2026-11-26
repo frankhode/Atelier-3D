@@ -368,12 +368,12 @@ test("3D guides show source and direction, explicitly identify an offscreen orig
 });
 
 
-test("the surface mode exposes only three intensity controls and updates them independently", async () => {
+test("the surface mode exposes four intensity controls and updates them independently", async () => {
   const f = await fixture();
   f.state.surfaces.enabled = true;
   f.ui.open("lights");
   assert.equal(f.document.querySelector("#panel-title").textContent, "Paredes luminosas");
-  assert.equal(f.document.querySelectorAll('input[type="range"]').length, 3);
+  assert.equal(f.document.querySelectorAll('input[type="range"]').length, 4);
   const left = f.document.querySelector('[data-path="surfaces.left"]');
   left.value = "0.45";
   left.dispatchEvent(new f.window.Event("input", {bubbles: true}));
@@ -381,6 +381,12 @@ test("the surface mode exposes only three intensity controls and updates them in
   assert.equal(f.state.surfaces.upper, 1);
   assert.equal(f.state.surfaces.front, 0.08);
   assert.ok(f.calls.includes("surfaces.left"));
+  const bounce = f.document.querySelector('[data-path="surfaces.bounce"]');
+  bounce.value = "0.7";
+  bounce.dispatchEvent(new f.window.Event("input", {bubbles:true}));
+  assert.equal(f.state.surfaces.bounce, 0.7);
+  assert.equal(f.state.surfaces.left, 0.45);
+  assert.equal(f.document.querySelector('[data-output="surfaces.bounce"]').textContent,"70%");
   assert.equal(f.document.querySelector('[data-output="surfaces.left"]').textContent,"45%");
   assert.ok(f.document.querySelector('[data-action="surface-mode"].active'));
   assert.ok(f.document.querySelector('[data-action="pictorial-mode"][data-value="true"]'));

@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import * as THREE from "three";
 import { defaultProject } from "../src/core/defaults.js";
-import { defaultSurfaces, surfaceDemoProject } from "../src/core/surfaces.js";
+import { defaultSurfaces, surfaceDemoProject, bounceDemoProject } from "../src/core/surfaces.js";
 import { serializeProject, validateProject } from "../src/core/project.js";
 import { Lighting } from "../src/scene/lighting.js";
 
@@ -63,4 +63,18 @@ test("surface emitters remain attached to the reference room when translated and
   assert.deepEqual(sample.position.toArray(),origin.multiplyScalar(2).add(new THREE.Vector3(3,2,1)).toArray());
   assert.deepEqual(sample.target.position.toArray(),target.multiplyScalar(2).add(new THREE.Vector3(3,2,1)).toArray());
   assert.equal(sample.intensity,intensity*4);
+});
+
+test("legacy surface files retain a direct-only composition, and the new isolated study starts with diffuse bounces",()=>{
+  const p = defaultProject();
+  p.surfaces.enabled = true;
+  delete p.surfaces.bounce;
+  assert.equal(validateProject(p).surfaces.bounce, 0);
+  const b = bounceDemoProject(defaultProject());
+  assert.equal(b.surfaces.bounce, .35);
+  assert.equal(validateProject(JSON.parse(serializeProject(b))).surfaces.bounce, .35);
+  for(const v of [-1,Infinity,2.01,"0.5",null]){
+    b.surfaces.bounce=v;
+    assert.throws(()=>validateProject(b));
+  }
 });

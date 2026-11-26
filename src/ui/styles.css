@@ -1333,3 +1333,11 @@ body.aiming-light .view-tools {
 .pictorial-zone .field { margin-bottom: 4px; }
 .pictorial-zone .toggle-row { color: var(--muted); font-size: 13px; }
 
+
+/* The four lighting controls stay readily accessible on short mobile panels. */
+.panel .surface-controls .section { margin-bottom: 13px; }
+.surface-controls .field { margin-bottom: 0; }
+.surface-controls .field-label { margin-bottom: 4px; }
+.surface-controls .bounce-section { border-top: 1px solid #3b4946; padding-top: 10px; }
+.surface-controls p.hint { margin: 5px 0 0; font-size: 12px; line-height: 1.35; }
+.surface-controls .button { margin-bottom: 0; }

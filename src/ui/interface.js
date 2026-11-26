@@ -546,9 +546,15 @@ export class Interface {
   }
   surfacePanel() {
     return this.lightingModes() +
-      '<p class="hint">Superficies emisoras invisibles, con posición fija. Las aberturas y los objetos interceptan la luz.</p>' +
+      '<div class="surface-controls">' +
       SURFACE_GROUPS.map(({key,label}) => '<section class="section">' + this.pictRange('surfaces.'+key,label,0,2,.01) + '</section>').join('') +
-      '<button class="button full" data-action="surface-reset">' + icon("reset") + 'Restablecer intensidades</button><p class="hint">0% apaga el grupo. Los focos y la luz ambiente no intervienen en este modo.</p>';
+      '<section class="section bounce-section">' + this.pictRange('surfaces.bounce','Luz rebotada',0,2,.01) +
+      '<p class="hint">0% · solo luz directa. 100% · dos rebotes difusos.</p>' +
+      (!this.state.models.some(m=>m.id==="sala-v04" && m.visible) ? '<p class="hint">Requiere la sala de referencia visible.</p>' :
+      this.models.bounceStudy?.error ? '<p class="hint">Mapa de rebotes no disponible.</p>' :
+      this.models.bounceStudy?.ready ? (this.state.models.find(m=>m.id==="sala-v04")?.hidden.length ? '<p class="hint">El mapa conserva los rebotes de la sala completa.</p>' : '') : '<p class="hint">Cargando mapa de rebotes…</p>') +
+      '</section>' +
+      '<button class="button full" data-action="surface-reset">' + icon("reset") + 'Restablecer intensidades</button></div>';
   }
   pictRange(path,label,min=0,max=1,step=.01,suffix='%',scale=100) {
     const value=get(this.state,path),shown=Math.round(value*scale*100)/100;

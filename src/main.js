@@ -1,4 +1,4 @@
-import { defaultSurfaces, surfaceDemoProject } from "./core/surfaces.js";
+import { defaultSurfaces, surfaceDemoProject, bounceDemoProject } from "./core/surfaces.js";
 import { defaultPictorial, pictorialDemoProject } from "./core/pictorial.js";
 import "./ui/styles.css";
 import { defaultProject, MAX_PROJECT_BYTES } from "./core/defaults.js";
@@ -19,9 +19,10 @@ import { ModelManager, recordFromFile } from "./scene/models.js";
 import { Interface } from "./ui/interface.js";
 
 const pictorialDemo = new URLSearchParams(location.search).get("pictorico") === "1";
-const surfaceDemo = !pictorialDemo && new URLSearchParams(location.search).get("superficies") === "1";
-const activeStorageKey = pictorialDemo ? "atelier3d:pictorial-study:v1" : surfaceDemo ? "atelier3d:surface-study:v1" : STORAGE_KEY;
-const newProject = () => pictorialDemo ? pictorialDemoProject(defaultProject()) : surfaceDemo ? surfaceDemoProject(defaultProject()) : defaultProject();
+const bounceDemo = !pictorialDemo && new URLSearchParams(location.search).get("rebotes") === "1";
+const surfaceDemo = !pictorialDemo && (bounceDemo || new URLSearchParams(location.search).get("superficies") === "1");
+const activeStorageKey = pictorialDemo ? "atelier3d:pictorial-study:v1" : bounceDemo ? "atelier3d:bounce-study:v1" : surfaceDemo ? "atelier3d:surface-study:v1" : STORAGE_KEY;
+const newProject = () => pictorialDemo ? pictorialDemoProject(defaultProject()) : bounceDemo ? bounceDemoProject(defaultProject()) : surfaceDemo ? surfaceDemoProject(defaultProject()) : defaultProject();
 async function boot() {
   const local = readLocal(undefined, activeStorageKey);
   const state = local.project || newProject();
@@ -157,11 +158,19 @@ async function boot() {
     clearTimeout(saveTimer);
     saveTimer = setTimeout(save, 650);
   }
+  async function ensureBounces() {
+    if (!state.surfaces?.enabled || !state.models.some(m=>m.id==="sala-v04" && m.visible) ||
+        models.bounceStudy.ready || models.bounceStudy.error || models.bounceStudy.loading) return;
+    const ok = await models.loadBounces();
+    if (ui?.activePanel === "lights") ui.refresh();
+    viewport.requestRender();
+    if (!ok && state.surfaces?.enabled) ui?.notify(models.bounceStudy.error?.message || "No se pudo cargar la luz rebotada.");
+  }
   function apply(path) {
     validateProject(state);
     if (path.startsWith("pictorial.") || path.startsWith("surfaces.")) {
       models.applyLook(); lighting.apply();
-      if (path === "pictorial.enabled" || path === "surfaces.enabled") ui.refresh();
+      if (path === "pictorial.enabled" || path === "surfaces.enabled") { ui.refresh(); if (state.surfaces?.enabled) void ensureBounces(); }
     }
     if (path.startsWith("camera.")) {
       rig.restore();
@@ -174,9 +183,11 @@ async function boot() {
     if (path.startsWith("models.")) {
       models.apply(state.models[Number(path.split(".")[1])].id);
       lighting.apply();
+      void ensureBounces();
     }
     if (path.startsWith("appearance.")) {
       models.material.color.set(state.appearance.material);
+      models.applyLook();
       viewport.applyAppearance();
     }
     if (path.startsWith("frame.")) viewport.resize();
@@ -190,9 +201,11 @@ async function boot() {
     lighting.setSolo(null);
     ui.setSoloLight(null);
     staged.forEach((entry) => models.mount(entry));
+    await ensureBounces();
     rig.restore();
     lighting.apply();
     models.material.color.set(state.appearance.material);
+    models.applyLook();
     viewport.applyAppearance();
     ui.refresh();
     changed();
@@ -428,7 +441,9 @@ async function boot() {
         else if (name === "up-y") model.transform.rotation[0] = 0;
         else if (name === "up-z") model.transform.rotation[0] = -90;
         models.apply(id);
+        models.applyLook();
         lighting.apply();
+        void ensureBounces();
         ui.refresh();
         changed();
       }
@@ -506,6 +521,7 @@ async function boot() {
   try {
     const staged = await models.prepareProject(state);
     staged.forEach((entry) => models.mount(entry));
+    await ensureBounces();
     viewport.applyAppearance();
     if (!local.project && !pictorialDemo) initialCamera();
     ui.update();

@@ -1,3 +1,4 @@
+import { BounceStudy } from "./bounce-study.js";
 import { PictorialStudy } from "./pictorial-study.js";
 import { pictorialZone } from "../core/pictorial.js";
 import * as THREE from "three";
@@ -71,6 +72,7 @@ export class ModelManager {
     });
     this.referenceText = null;
     this.study = new PictorialStudy(state);
+    this.bounceStudy = new BounceStudy(state, this.material);
   }
   async parse(record) {
     if (record.kind === "builtin") {
@@ -176,10 +178,18 @@ export class ModelManager {
     wrapper.updateMatrixWorld(true);
     this.applyLook();
   }
+  async loadBounces() {
+    const ok = await this.bounceStudy.load(this.referenceText);
+    this.applyLook();
+    return ok;
+  }
   applyLook() {
     this.study.apply();
+    this.bounceStudy.apply();
+    const useBounces = this.state.surfaces?.enabled && this.bounceStudy.ready &&
+      this.state.models.some(m=>m.id==="sala-v04" && m.visible);
     for (const entry of this.entries.values()) for (const object of entry.objects) {
-      object.mesh.material = this.state.pictorial?.enabled ? this.study.materialFor(object.mesh.userData.pictorialZone || "other") : this.material;
+      object.mesh.material = this.state.pictorial?.enabled ? this.study.materialFor(object.mesh.userData.pictorialZone || "other") : useBounces ? this.bounceStudy.material : this.material;
     }
   }
   remove(id) {
@@ -218,3 +228,4 @@ export class ModelManager {
     }
   }
 }
+

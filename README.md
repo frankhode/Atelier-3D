@@ -141,3 +141,15 @@ Tres intensidades independientes (0–200%, 0% = apagado):
 - **Exterior frontal**: fuera del encuadre, hacia las figuras.
 
 Las posiciones están fijadas a la sala de referencia; no hay que ajustar origen, dirección o apertura. Ocho emisores discretos con sombras, repartidos por las superficies, aproximan una fuente extensa sin renderizar un panel visible. La geometría sigue interceptando la luz. No es iluminación global ni una integración continua de toda la superficie: pueden resultar transiciones de sombra escalonadas. Focos y ambiente se desactivan temporalmente en este modo. Sus valores permanecen guardados y el JSON conserva también las intensidades del nuevo modo.
+
+## Prueba de rebotes y mezcla
+
+Abrir [el estudio de luz rebotada](https://frankhode.github.io/Atelier-3D/?rebotes=1). Utiliza su propio guardado en el navegador, sin reemplazar las composiciones anteriores. El modo **Luces → Superficies** tiene ahora un cuarto control, **Luz rebotada** (0–200%; 0% = luz directa, 100% = estimación de los dos rebotes). Los JSON existentes sin este campo conservan la iluminación directa original.
+
+Se precalculan dos órdenes de transporte difuso mediante rayos que intersectan la geometría de la sala: más de 32.000 subtriángulos y 4.406 sondas espaciales válidas, con seis lobos direccionales. Cada orden almacena las contribuciones de los tres grupos emisores por separado. En el render se combinan en espacio lineal antes de aplicar el material y la exposición. El color del material neutro modula la reflectancia de cada orden. El mapa se carga como una textura tridimensional de aproximadamente 220 KiB en GPU, por lo que las intensidades y el efecto de rebote se regulan sin volver a lanzar rayos en Android. Para regenerar el mapa después de editar la arquitectura o las fuentes:
+
+```sh
+node scripts/bake-bounces.mjs
+```
+
+El mapa contiene la firma de las fuentes y de la geometría original para detectar incompatibilidades. Está anclado a la sala: sigue su posición, rotación y escala. Las figuras OBJ/GLB reciben iluminación difusa según su posición y orientación, pero sus aportes reflectantes y su oclusión indirecta no se precalculan; mantienen las sombras directas. Ocultar piezas tampoco recalcula el mapa (se conserva la arquitectura completa). La solución es una aproximación de claroscuro, no un trazador de caminos general ni iluminación global en tiempo real.

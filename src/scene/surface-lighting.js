@@ -3,6 +3,8 @@ import * as THREE from "three";
 // Fixed emitters in the reference room's local coordinates. Broad, distributed
 // samples approximate rectangular emitters with actual occlusion by the room.
 // No mesh/emissive panel is added: the source is invisible to the camera.
+export const SURFACE_SPOT_ANGLE = 52;
+export const SURFACE_SPOT_PENUMBRA = 0.75;
 export const SURFACE_PANELS = [
   // The upper adjoining room extends from x=8.4 to 11.2, y=2.8 to 5.6.
   // Two inward-facing walls near the stair opening (z=0..1.4).
@@ -22,7 +24,7 @@ export class SurfaceLighting {
   constructor(scene, state) {
     this.state = state;
     this.samples = SURFACE_PANELS.flatMap(panel => panel.samples.map(origin => {
-      const light = new THREE.SpotLight(0xffffff, 0, 0, THREE.MathUtils.degToRad(52), 0.75, 2);
+      const light = new THREE.SpotLight(0xffffff, 0, 0, THREE.MathUtils.degToRad(SURFACE_SPOT_ANGLE), SURFACE_SPOT_PENUMBRA, 2);
       light.name = "Superficie · " + panel.group;
       light.castShadow = true;
       light.shadow.bias = -0.0009;

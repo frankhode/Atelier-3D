@@ -77,7 +77,7 @@ try {
  await page.locator('#loading').waitFor({state:'hidden',timeout:30000});
  await page.locator('[data-panel="lights"]').click();
  assert.equal(await page.locator('#panel-title').textContent(),'Paredes luminosas');
- assert.equal(await page.locator('input[type="range"]').count(),3);
+ assert.equal(await page.locator('input[type="range"]').count(),4);
  const setSurface=async(key,value)=>{
    await page.locator('[data-path="surfaces.'+key+'"]').evaluate((el,value)=>{el.value=String(value);el.dispatchEvent(new Event('input',{bubbles:true}));},value);
  };
@@ -110,6 +110,43 @@ try {
  assert.equal(await page.evaluate(()=>localStorage.getItem('atelier3d:composition:v1')),'physical-composition-untouched');
  await page.setViewportSize({width:390,height:780});await delay(350);
  await page.screenshot({path:'artifacts/surface-mobile.png'});
+ // Isolate the upper source and confirm that real pixels in shadow respond to
+ // the indirect field. Turning off the source must also turn off its bounces.
+ await page.setViewportSize({width:1000,height:800});
+ await page.goto('http://127.0.0.1:4179/?rebotes=1');
+ await page.locator('#loading').waitFor({state:'hidden',timeout:30000});
+ await page.locator('[data-panel="lights"]').click();
+ assert.equal(await page.locator('[data-output="surfaces.bounce"]').textContent(),'35%');
+ const shadowMean=()=>page.evaluate(()=>{
+   const f=window.__studyFrame;let sum=0,count=0;
+   for(let y=Math.round(f.height*.24);y<f.height*.36;y+=3)for(let x=Math.round(f.width*.54);x<f.width*.73;x+=3){
+     const at=4*(y*f.width+x);sum+=(f.pixels[at]+f.pixels[at+1]+f.pixels[at+2])/3;count++;
+   }
+   return sum/count;
+ });
+ await freshFrame(async()=>{await setSurface('left',0);await setSurface('front',0);await setSurface('bounce',0);});
+ const shadowDirect=await shadowMean();
+ await page.locator('#close-panel').click();
+ await page.screenshot({path:'artifacts/bounces-direct.png'});
+ await page.locator('[data-panel="lights"]').click();
+ await freshFrame(()=>setSurface('bounce',.35));
+ const shadow35=await shadowMean();
+ await freshFrame(()=>setSurface('bounce',1));
+ const shadow100=await shadowMean();
+ console.log('Luminance in upper-source shadow (0,35,100% bounces):',{shadowDirect,shadow35,shadow100});
+ assert.ok(shadow35>shadowDirect+8,'Reflected light must lift the shadow without an ambient source.');
+ assert.ok(shadow100>shadow35+8,'Increasing the bounce gain must lift the shadow.');
+ await page.locator('#close-panel').click();
+ await page.screenshot({path:'artifacts/bounces-100.png'});
+ await page.locator('[data-panel="lights"]').click();
+ await freshFrame(()=>setSurface('upper',0));
+ assert.ok(await mean()<5,'Turning off all sources also eliminates all indirect light.');
+ await page.locator('[data-action="surface-reset"]').click();
+ await page.waitForFunction(()=>{const saved=JSON.parse(localStorage.getItem('atelier3d:bounce-study:v1')||'null');return saved?.surfaces?.bounce===.35&&saved.surfaces.upper===1;},undefined,{timeout:5000});
+ assert.equal(await page.evaluate(()=>localStorage.getItem('atelier3d:composition:v1')),'physical-composition-untouched');
+ assert.ok(await page.evaluate(()=>JSON.parse(localStorage.getItem('atelier3d:surface-study:v1')).surfaces.enabled),'the previous surface study remains stored separately');
+ await page.setViewportSize({width:390,height:780});await delay(350);
+ await page.screenshot({path:'artifacts/bounces-mobile.png'});
  assert.deepEqual(errors,[],'The scene must compile its shaders and run without browser errors');
  console.log('WebGL render checks passed, including distinct plane values and a responsive painterly control.');
 } catch(error) { console.error('Browser diagnostics:',errors.map(message=>message.slice(0,1800))); throw error; } finally {await browser?.close();if(process.platform==='win32'){server.kill('SIGTERM');server.stdout.destroy();server.stderr.destroy();}else{try{process.kill(-server.pid,'SIGTERM');}catch(error){if(error.code!=='ESRCH')throw error;}}}
