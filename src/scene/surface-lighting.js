@@ -12,12 +12,12 @@ export const SURFACE_PANELS = [
     samples: [[11.12, 3.45, 0.85], [11.12, 4.65, 1.65]] },
   { group: "upper", normal: [-0.85, -0.08, 0.5], power: 180,
     samples: [[8.85, 3.6, 0.14], [10.1, 4.6, 0.14]] },
-  // Secondary sources outside the room: behind the left French window and
-  // beyond the open front, at approximately eye/figure height.
+  // Secondary sources on opposite sides, behind the left French window and
+  // the two right-hand openings below the upper storey, at figure height.
   { group: "left", normal: [1, 0, 0], power: 300,
     samples: [[-1.25, 1.15, 2.45], [-1.25, 2.05, 3.95]] },
-  { group: "front", normal: [0, 0, -1], power: 230,
-    samples: [[2.1, 1.4, 8.1], [6.1, 2.2, 8.1]] },
+  { group: "right", normal: [-1, 0, 0], power: 230,
+    samples: [[9.65, 1.15, 2.40], [9.65, 2.05, 4.45]] },
 ];
 
 export class SurfaceLighting {

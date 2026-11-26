@@ -6,7 +6,7 @@ import { createHash } from "node:crypto";
 import { OBJLoader } from "three/addons/loaders/OBJLoader.js";
 import { SURFACE_PANELS, SURFACE_SPOT_ANGLE, SURFACE_SPOT_PENUMBRA } from "../src/scene/surface-lighting.js";
 
-const groups = ["upper", "left", "front"];
+const groups = ["upper", "left", "right"];
 const PI = Math.PI, TAU = 2 * PI, GOLDEN = 0.6180339887498949;
 const EPS = 0.001, patchSize = 0.52;
 const V = (x = 0, y = 0, z = 0) => [x,y,z];

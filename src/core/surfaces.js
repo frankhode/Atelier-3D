@@ -2,10 +2,10 @@
 export const SURFACE_GROUPS = [
   { key: "upper", label: "Planta alta · luz principal" },
   { key: "left", label: "Exterior izquierdo · ventanal" },
-  { key: "front", label: "Exterior frontal · relleno" },
+  { key: "right", label: "Exterior derecho · aberturas" },
 ];
 export function defaultSurfaces() {
-  return { enabled: false, upper: 1, left: 0.12, front: 0.08, bounce: 0.35 };
+  return { enabled: false, upper: 1, left: 0.12, right: 0.08, bounce: 0.35 };
 }
 export function validateSurfaces(input) {
   if (input === undefined) return defaultSurfaces();
@@ -13,7 +13,8 @@ export function validateSurfaces(input) {
     throw new Error("Modo de superficies inválido.");
   const result = { enabled: input.enabled };
   for (const { key } of SURFACE_GROUPS) {
-    const value = input[key];
+    // Previously saved frontal fill becomes the new right-hand fill.
+    const value = key === "right" && input.right === undefined ? input.front : input[key];
     if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 2)
       throw new Error("Intensidad de superficie fuera de rango.");
     result[key] = value;

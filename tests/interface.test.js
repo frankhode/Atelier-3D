@@ -379,7 +379,7 @@ test("the surface mode exposes four intensity controls and updates them independ
   left.dispatchEvent(new f.window.Event("input", {bubbles: true}));
   assert.equal(f.state.surfaces.left, 0.45);
   assert.equal(f.state.surfaces.upper, 1);
-  assert.equal(f.state.surfaces.front, 0.08);
+  assert.equal(f.state.surfaces.right, 0.08);
   assert.ok(f.calls.includes("surfaces.left"));
   const bounce = f.document.querySelector('[data-path="surfaces.bounce"]');
   bounce.value = "0.7";

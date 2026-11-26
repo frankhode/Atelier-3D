@@ -13,7 +13,7 @@ test("older projects keep their mode; area intensity and original lights round-t
   assert.deepEqual(old.surfaces, defaultSurfaces());
   const demo = surfaceDemoProject(old);
   demo.surfaces.left = 0.38;
-  demo.surfaces.front = 0;
+  demo.surfaces.right = 0;
   assert.deepEqual(validateProject(JSON.parse(serializeProject(demo))), demo);
   assert.equal(demo.pictorial.enabled, false);
   assert.deepEqual(demo.lights, p.lights);
@@ -76,5 +76,24 @@ test("legacy surface files retain a direct-only composition, and the new isolate
   for(const v of [-1,Infinity,2.01,"0.5",null]){
     b.surfaces.bounce=v;
     assert.throws(()=>validateProject(b));
+  }
+});
+
+test("the former frontal intensity migrates to the right lateral group without changing the other sliders",()=>{
+  const p=defaultProject();p.surfaces.enabled=true;
+  p.surfaces.upper=.8;p.surfaces.left=.12;p.surfaces.front=.27;
+  delete p.surfaces.right;
+  const result=validateProject(p);
+  assert.deepEqual(result.surfaces,{enabled:true,upper:.8,left:.12,right:.27,bounce:.35});
+  const lighting=new Lighting(new THREE.Scene(),result);
+  const sample=lighting.surfaces.samples.filter(({panel})=>panel.group==="right");
+  assert.equal(sample.length,2);
+  for(const {light} of sample){
+    // Both emitters illuminate from the lower room through its two openings.
+    assert.ok(light.position.x>8.4 && light.position.x<11.2);
+    assert.ok(light.position.y>0 && light.position.y<2.3);
+    assert.ok(light.target.position.x<light.position.x);
+    assert.equal(light.target.position.z,light.position.z);
+    assert.ok(light.intensity>0 && light.visible);
   }
 });

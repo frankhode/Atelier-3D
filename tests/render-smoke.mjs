@@ -81,6 +81,12 @@ try {
  const setSurface=async(key,value)=>{
    await page.locator('[data-path="surfaces.'+key+'"]').evaluate((el,value)=>{el.value=String(value);el.dispatchEvent(new Event('input',{bubbles:true}));},value);
  };
+ const setSurfaces=async(values)=>page.evaluate(values=>{
+   for(const [key,value] of Object.entries(values)){
+     const el=document.querySelector('[data-path="surfaces.'+key+'"]');
+     el.value=String(value);el.dispatchEvent(new Event('input',{bubbles:true}));
+   }
+ },values);
  const mean=()=>page.evaluate(()=>{
    const f=window.__studyFrame;if(!f)return -1;
    let sum=0,count=0;
@@ -91,22 +97,30 @@ try {
    const seq=await page.evaluate(()=>window.__studyFrame?.sequence||0);
    await action();
    await page.waitForFunction(seq=>window.__studyFrame?.sequence>seq,seq,{timeout:20000});
+   await delay(250);
  }
- await freshFrame(async()=>{await setSurface('left',0);await setSurface('front',0);});
+ await freshFrame(()=>setSurfaces({left:0,right:0}));
  const surfaceMain=await mean();
  await page.locator('#close-panel').click();
  await page.screenshot({path:'artifacts/surface-main.png'});
  await page.locator('[data-panel="lights"]').click();
  await freshFrame(()=>setSurface('upper',0));
  const surfaceDark=await mean();
- await freshFrame(()=>setSurface('front',0.4));
+ await freshFrame(()=>setSurface('right',0.4));
  const surfaceFill=await mean();
  console.log('Actual WebGL surface luminances:',{surfaceMain,surfaceDark,surfaceFill});
  assert.ok(surfaceMain>surfaceDark+25,'The upper walls must visibly illuminate the room through the opening.');
  assert.ok(surfaceFill>surfaceDark+20,'A secondary area source must illuminate the room independently.');
  assert.ok(surfaceDark<5,'Zero intensities must leave the room in darkness.');
+ await freshFrame(()=>setSurface('bounce',.8));
+ const lateralReflected=await mean();
+ console.log('Right lateral direct + indirect:',{surfaceFill,lateralReflected});
+ assert.ok(lateralReflected>surfaceFill+5,'The right-hand source must generate independent diffuse bounces.');
+ await page.locator('#close-panel').click();
+ await page.screenshot({path:'artifacts/lateral-right.png'});
+ await page.locator('[data-panel="lights"]').click();
  await page.locator('[data-action="surface-reset"]').click();
- await page.waitForFunction(()=>{const saved=JSON.parse(localStorage.getItem('atelier3d:surface-study:v1')||'null');return saved?.surfaces?.enabled&&saved.surfaces.upper===1&&saved.surfaces.front===.08;},undefined,{timeout:5000});
+ await page.waitForFunction(()=>{const saved=JSON.parse(localStorage.getItem('atelier3d:surface-study:v1')||'null');return saved?.surfaces?.enabled&&saved.surfaces.upper===1&&saved.surfaces.right===.08;},undefined,{timeout:5000});
  assert.equal(await page.evaluate(()=>localStorage.getItem('atelier3d:composition:v1')),'physical-composition-untouched');
  await page.setViewportSize({width:390,height:780});await delay(350);
  await page.screenshot({path:'artifacts/surface-mobile.png'});
@@ -124,7 +138,7 @@ try {
    }
    return sum/count;
  });
- await freshFrame(async()=>{await setSurface('left',0);await setSurface('front',0);await setSurface('bounce',0);});
+ await freshFrame(()=>setSurfaces({left:0,right:0,bounce:0}));
  const shadowDirect=await shadowMean();
  await page.locator('#close-panel').click();
  await page.screenshot({path:'artifacts/bounces-direct.png'});

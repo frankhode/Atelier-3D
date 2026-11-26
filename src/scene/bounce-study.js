@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { SURFACE_PANELS, SURFACE_SPOT_ANGLE, SURFACE_SPOT_PENUMBRA } from "./surface-lighting.js";
 
-const URL = `${import.meta.env?.BASE_URL ?? "/"}models/sala-v04-bounces.json`;
+const URL = `${import.meta.env?.BASE_URL ?? "/"}models/sala-v04-bounces.json?v=2`;
 const LAYERS = 12; // 6 normal lobes × 2 reflection orders
 const validVector = (v) => Array.isArray(v) && v.length === 3 && v.every(Number.isFinite);
 export function decodeBounceField(field) {
@@ -145,7 +145,7 @@ export class BounceStudy {
     const room=p.models.find(m=>m.id==="sala-v04" && m.visible);
     this.material.color.set(p.appearance.material);
     u.uBounceReflectance.value.copy(this.material.color);
-    u.uBounceSources.value.set(s?.upper??0,s?.left??0,s?.front??0);
+    u.uBounceSources.value.set(s?.upper??0,s?.left??0,s?.right??0);
     u.uBounceStrength.value=this.ready && room && s?.enabled && !p.pictorial?.enabled ? s.bounce??0 : 0;
     if(room){
       const {position,rotation,scale}=room.transform;

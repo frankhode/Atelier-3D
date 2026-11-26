@@ -138,7 +138,7 @@ Abrir [el estudio de superficies](https://frankhode.github.io/Atelier-3D/?superf
 Tres intensidades independientes (0–200%, 0% = apagado):
 - **Planta alta**: dos paredes del ambiente superior, cerca de la abertura de la escalera.
 - **Exterior izquierdo**: detrás de la puerta ventana.
-- **Exterior frontal**: fuera del encuadre, hacia las figuras.
+- **Exterior derecho**: detrás de las aberturas inferiores de la planta alta, en dirección opuesta al ventanal izquierdo. La intensidad del antiguo relleno frontal se conserva como intensidad de esta nueva fuente.
 
 Las posiciones están fijadas a la sala de referencia; no hay que ajustar origen, dirección o apertura. Ocho emisores discretos con sombras, repartidos por las superficies, aproximan una fuente extensa sin renderizar un panel visible. La geometría sigue interceptando la luz. No es iluminación global ni una integración continua de toda la superficie: pueden resultar transiciones de sombra escalonadas. Focos y ambiente se desactivan temporalmente en este modo. Sus valores permanecen guardados y el JSON conserva también las intensidades del nuevo modo.
 
